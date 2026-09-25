@@ -1,16 +1,54 @@
 <p><img src="docs/assets/app-icon.svg" width="88" height="88" alt="pureprojects icon"></p>
 
-# PureProjects
+# pureprojects
 
-## App documentation
+## What pureprojects does
 
-Track deliverables, owners, dates, next actions, and project documents.
+A workspace for knowledge-work projects: outcomes, deliverables, dates, owners, next actions, and things you are waiting on. Keep the documents supporting a project alongside its plan.
+
+## App layout
+
+| Area | What you use it for |
+| --- | --- |
+| **Project list** | Browse projects and select the one you want to work on. |
+| **Project detail** | Review the outcome, deliverables, owners, dates, and progress. |
+| **Next action and waiting items** | Keep the immediate work and outstanding dependencies visible. |
+| **Document tools** | Attach or choose project documents and open them for editing. |
+
+The app also uses the shared [puredesktop](https://puredesktop.ai) shell and drawer agent. Panels can vary with the current view and selection.
+
+## Getting started
 
 1. Create a project and describe the outcome you are working toward.
 2. Add deliverables with owners and dates, then record the next action and anything you are waiting on.
 3. Link the documents that support the project and revisit progress as work advances.
 
-Read the [app guide](docs/app-guide.md) for usage and development requirements. This app runs within [puredesktop](https://puredesktop.ai).
+Read the [app guide](docs/app-guide.md) for development, loading, and source-layout details.
+
+## Develop and customize
+
+You can develop this app outside [puredesktop](https://puredesktop.ai), using your preferred editor, terminal, and coding tools, then load the module into [puredesktop](https://puredesktop.ai) to use and test it. You can also change your local version from **purefactory** or through **the app’s drawer agent**.
+
+### Use your own development tools
+
+1. Fork or clone this repository and work on a local copy in your editor.
+2. Set up the app’s dependencies and run its development server or build. See the [app guide](docs/app-guide.md#development-and-loading) for this repository’s requirements and scripts.
+3. Load the module into [puredesktop](https://puredesktop.ai). For a local web development server, the platform guide describes **File → Register App…**: register its URL, app name, and required permissions, then open it from **Browse Apps**. Keep the development server running while using that entry point.
+4. Make changes in your editor, reload the app as needed, and test its file, account, and agent integrations inside the desktop. A distributable `.pureapp` package can be loaded through **File → Install App…**.
+
+See the [app development and integration guide](https://puredesktop.ai/docs/apps/) for registration, the app manifest, the bridge, and packaging. Editing outside the desktop does not remove this module’s shared-dependency requirements.
+
+### Use purefactory or the app’s drawer agent
+
+Open your local app project in **purefactory** to develop it there, or open the app’s **drawer agent** and describe the change you want to make to your local version. Specify whether you want to change the app itself or work on the document or data currently open. Review the resulting source changes, run the relevant checks, and reload your local app to try them. You can keep the changes for yourself, develop a fork, or contribute them back with a pull request.
+
+## Developer accounts and the marketplace
+
+[Create a developer account on puredesktop.ai](https://puredesktop.ai/developers) to take part in the developer community and submit apps for review. We welcome contributions to this app, forks that take it in a different direction, and entirely new apps to offer on [puredesktop](https://puredesktop.ai).
+
+We welcome **open-source and proprietary projects alike** to the [puredesktop](https://puredesktop.ai) marketplace. A marketplace with support for **paid apps is coming soon**, so developers will be able to charge for their apps if they choose. When distributing a fork, follow the licenses of the code and dependencies you use.
+
+For more information about developer accounts, app submissions, or the upcoming marketplace, contact [info@puredesktop.ai](mailto:info@puredesktop.ai).
 
 ## Open source and contributions
 
