@@ -1,4 +1,16 @@
+<p><img src="docs/assets/app-icon.svg" width="88" height="88" alt="pureprojects icon"></p>
+
 # PureProjects
+
+## App documentation
+
+Track deliverables, owners, dates, next actions, and project documents.
+
+1. Create a project and describe the outcome you are working toward.
+2. Add deliverables with owners and dates, then record the next action and anything you are waiting on.
+3. Link the documents that support the project and revisit progress as work advances.
+
+Read the [app guide](docs/app-guide.md) for usage and development requirements. This app runs within [puredesktop](https://puredesktop.ai).
 
 ## Open source and contributions
 
@@ -15,32 +27,21 @@ Copyright (c) 2026 pure.science inc. Third-party code, dependencies, and assets 
 
 ### Major open-source projects
 
-- [jszip](https://github.com/Stuk/jszip).
-- [react](https://github.com/react/react).
-- [react-dom](https://github.com/react/react).
-- [styled-components](https://github.com/styled-components/styled-components).
+| Project / source | Homepage or documentation | Support the maintainers |
+| --- | --- | --- |
+| [Stuk/jszip](https://github.com/Stuk/jszip) | [Homepage / docs](https://stuk.github.io/jszip/) | [GitHub Sponsors](https://github.com/sponsors/Stuk) |
+| [react/react](https://github.com/react/react) | [Homepage / docs](https://react.dev) | — |
+| [styled-components/styled-components](https://github.com/styled-components/styled-components) | [Homepage / docs](https://styled-components.com) | [GitHub Sponsors](https://github.com/sponsors/quantizor) · [Open Collective](https://opencollective.com/styled-components) |
 
 Thank you to these projects and their contributors. Additional direct dependencies,
 upstream links, and asset notices are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-### Snapshot and development context
-
-Based on a cleaned snapshot from [Nikau-Dev/pureprojects](https://github.com/Nikau-Dev/pureprojects) at
-commit `e3a83ea5dc3d1033b52d89e51cec0a38de72522d` (main branch snapshot, 2026-09-25).
-This repository begins with one clean initial commit; previous Git history was not copied.
-Bundled demo datasets, saved development records, and identifying personal examples were removed or anonymized.
-
-This is a PureDesktop app source repository. Local `@purescience/platform-*`
-dependencies refer to shared packages in the parent suite and are not included here.
-Use the matching PureDesktop development environment and the app's existing scripts;
-this snapshot alone is not a complete standalone desktop application.
 
 
 Track knowledge-work projects: deliverables with dates and owners, the next
 action, what you are waiting on, and the documents each project pulls
 together.
 
-Part of the **PureDesktop** suite: this repo is mounted as a git submodule
+Part of the **[puredesktop](https://puredesktop.ai)** suite: this repo is mounted as a git submodule
 at `apps/pureprojects` in [Nikau-Dev/ps-suite](https://github.com/Nikau-Dev/ps-suite).
 App slug `projects`, dev port `5410` (declared once, in `plugin.json` →
 `entrypoint.url`).
