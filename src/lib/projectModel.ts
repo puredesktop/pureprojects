@@ -1,4 +1,5 @@
 import { PROJECTS_STORE_VERSION } from '../constants'
+import { linkLabelFromPath } from './projectLinks'
 import type {
   Deliverable,
   JournalEntry,
@@ -47,11 +48,35 @@ function normalizeProject(project: Project): Project {
     waitingOn: normalizeWaitingOn(project),
     deliverables: Array.isArray(project.deliverables) ? project.deliverables : [],
     journal: Array.isArray(project.journal) ? project.journal : [],
-    links: Array.isArray(project.links) ? project.links : [],
+    links: normalizeLinks(project.links),
     closedAt: project.closedAt ?? null,
     archivedAt: project.archivedAt ?? null,
     order: typeof project.order === 'number' ? project.order : null,
   }
+}
+
+/**
+ * Imports have historically called a link's visible title either `label` or
+ * `name`. Do not leave the title blank when neither was supplied: the path is
+ * still enough to give the document list a useful filename.
+ */
+function normalizeLinks(raw: unknown): ProjectLink[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter(
+      (item): item is ProjectLink & { name?: unknown } =>
+        !!item &&
+        typeof item === 'object' &&
+        typeof (item as ProjectLink).path === 'string',
+    )
+    .map(item => {
+      const label = typeof item.label === 'string' ? item.label.trim() : ''
+      const importedName = typeof item.name === 'string' ? item.name.trim() : ''
+      return {
+        ...item,
+        label: label || importedName || linkLabelFromPath(item.path),
+      }
+    })
 }
 
 /**
@@ -263,7 +288,7 @@ export function linkDocument(
   if (existing) return project
   const projectLink: ProjectLink = {
     id: makeId('lnk', now),
-    label: link.label,
+    label: link.label.trim() || linkLabelFromPath(link.path),
     path: link.path,
     kind: link.kind ?? 'document',
   }

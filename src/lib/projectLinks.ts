@@ -64,6 +64,11 @@ function fileLabel(path: string): string {
   return name.replace(/\.[^.]+$/, '') || path
 }
 
+/** A useful visible name when an imported link did not include one. */
+export function linkLabelFromPath(path: string): string {
+  return /^https?:\/\//i.test(path) ? linkHost(path) : fileLabel(path)
+}
+
 /**
  * Web links stored before `kind: 'web'` existed carry `kind: 'document'`
  * with an http path, so the path is the authority and the kind is the
