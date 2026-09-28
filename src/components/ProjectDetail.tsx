@@ -19,6 +19,8 @@ import { exportableDocuments } from '../lib/documentExport'
 import type { Deliverable, Project, ProjectLink } from '../types'
 
 const Pane = styled.div`
+  container-type: inline-size;
+  container-name: project-detail;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -62,6 +64,11 @@ const Columns = styled.div`
   display: flex;
   flex: 1;
   min-height: 0;
+
+  @container project-detail (max-width: 900px) {
+    flex-direction: column;
+    overflow-y: auto;
+  }
 `
 
 const Content = styled.div`
@@ -72,16 +79,32 @@ const Content = styled.div`
   min-width: 0;
   padding: 22px 24px;
   overflow-y: auto;
+
+  @container project-detail (max-width: 900px) {
+    flex: none;
+    overflow-y: visible;
+  }
 `
 
 /** The right column — waiting on, documents: the platform sidebar. */
 const Aside = styled.aside.attrs(chrome('sidebar', { 'data-side': 'right' }))`
+  --pure-chrome-sidebar-width: clamp(360px, 32cqw, 560px);
+  box-sizing: border-box;
   gap: 22px;
   padding: 22px var(--pure-chrome-inset);
+
+  @container project-detail (max-width: 900px) {
+    && {
+      flex: none;
+      width: 100%;
+      overflow-y: visible;
+    }
+  }
 `
 
 const SectionHead = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 
@@ -486,6 +509,7 @@ const NextChip = styled.span`
 
 const ExportBar = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
