@@ -282,6 +282,28 @@ describe('parseStore', () => {
     expect(only.people).toEqual([])
     expect(only.status).toBe('active')
   })
+
+  it('gives ingested document links their imported name or filename', () => {
+    const parsed = parseStore({
+      projects: [
+        {
+          id: 'a',
+          name: 'Imported',
+          links: [
+            { id: 'one', name: 'Board minutes', path: '/Pure/scan-001.pdf', kind: 'document' },
+            { id: 'two', path: '/Pure/Trust deed.document', kind: 'document' },
+            { id: 'three', label: '  ', path: 'https://example.com/reference', kind: 'web' },
+          ],
+        },
+      ],
+    })
+
+    expect(parsed.projects[0]!.links.map(link => link.label)).toEqual([
+      'Board minutes',
+      'Trust deed',
+      'example.com',
+    ])
+  })
 })
 
 describe('manual-only edits', () => {
