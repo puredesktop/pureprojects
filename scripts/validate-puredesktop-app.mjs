@@ -110,7 +110,9 @@ function requireOnePackageDependency(dependencies, names) {
 }
 
 function validateManifest(manifest) {
-  if (manifest.schemaVersion !== 1) errors.push('schemaVersion must be 1.')
+  if (Object.hasOwn(manifest, 'schemaVersion')) {
+    errors.push('Remove schemaVersion from plugin.json; the desktop manifest does not support it.')
+  }
   if (!nonEmptyString(manifest.id)) errors.push('id is required.')
   if (!nonEmptyString(manifest.name)) errors.push('name is required.')
   if (!isPlainObject(manifest.app)) {
