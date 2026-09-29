@@ -924,6 +924,7 @@ export function App(): React.ReactElement {
     return (
       <AppFrame identityAppSlug={PROJECTS_APP_SLUG}>
         <EmptyState
+          robot="offline"
           tone="error"
           title="PureProjects could not reach the desktop"
           message={bridgeError instanceof Error ? bridgeError.message : String(bridgeError)}
@@ -1154,12 +1155,14 @@ export function App(): React.ReactElement {
               <Main>
                 {loadError ? (
                   <EmptyState
+                    robot="error"
                     tone="error"
                     title="Your projects could not be read"
                     message={loadError}
                   />
                 ) : store.projects.length === 0 ? (
                   <EmptyState
+                    robot="empty-projects"
                     tone="neutral"
                     title="No projects yet"
                     message="Start one with New project, or ask the assistant to."
