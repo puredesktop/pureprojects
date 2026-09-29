@@ -37,8 +37,12 @@ export const Shell = styled.div`
 
 /** The list's control row: search, sort, New — the platform toolbar. */
 export const Toolbar = styled.div.attrs(chrome('toolbar'))`
-  gap: 16px;
+  gap: 12px;
   padding: 0 var(--pure-chrome-inset);
+  /* The list card below is the one surface; the toolbar floats above it
+     on the same wallpaper rather than drawing its own band. */
+  background: transparent;
+  border-bottom: 0;
 `
 
 export const Search = styled.input.attrs(chrome('field'))`
@@ -83,9 +87,29 @@ export const Main = styled.main`
 `
 
 export const Scroll = styled.div`
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
+`
+
+/**
+ * The list as one frosted card on the wallpaper: margins all round, rounded
+ * corners, the platform glass. It hugs its rows, so a short list ends with
+ * the card instead of a band of bare wallpaper.
+ */
+export const ListCard = styled.section`
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: 4px var(--pure-chrome-inset) 12px;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge, var(--projects-line));
+  border-radius: 16px;
+  background: var(--glass-panel, var(--pure-chrome-paper));
+  backdrop-filter: var(--glass-blur, none);
+  -webkit-backdrop-filter: var(--glass-blur, none);
+  box-shadow: var(--glass-shadow, none);
 `
 
 const rowGrid = css`
@@ -102,8 +126,8 @@ export const HeaderRow = styled.div`
   min-height: 0;
   padding-top: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--projects-line);
-  background: var(--pure-chrome-bar);
+  border-bottom: 1px solid var(--glass-line, var(--projects-line));
+  background: transparent;
   font-family: var(--platform-typography-font-family-mono);
   font-size: var(--pure-chrome-label-size);
   font-weight: 500;
@@ -129,17 +153,21 @@ export const Row = styled.button<{
         ? 'inset 0 -2px 0 var(--projects-accent)'
         : 'none'};
   border: 0;
-  border-bottom: 1px solid var(--projects-line);
+  border-bottom: 1px solid var(--glass-line, var(--projects-line));
   background: ${({ $selected }) =>
-    $selected ? 'var(--pure-chrome-selection)' : 'var(--pure-chrome-paper)'};
+    $selected ? 'var(--pure-chrome-selection)' : 'transparent'};
   color: inherit;
   font: inherit;
   font-size: var(--pure-chrome-ui-size);
   text-align: left;
   cursor: pointer;
 
+  &:last-child {
+    border-bottom: 0;
+  }
+
   &:hover {
-    background: var(--pure-chrome-hover);
+    background: var(--glass-well, var(--pure-chrome-hover));
   }
 `
 
@@ -260,8 +288,8 @@ export const Footer = styled.div.attrs(chrome('meta'))`
   gap: 10px;
   flex: none;
   padding: 10px var(--pure-chrome-inset);
-  border-top: 1px solid var(--projects-line);
-  background: var(--pure-chrome-bar);
+  border-top: 0;
+  background: transparent;
 `
 
 export const Button = styled.button<{ $primary?: boolean }>`
