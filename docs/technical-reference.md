@@ -27,13 +27,10 @@ Or run just this app from the suite root with `npm run dev -w @purescience/purep
 npm run typecheck
 npm run build
 npm run test
-npm run puredesktop:check
 ```
 
-`puredesktop:check` verifies the package facts the shell needs: manifest
-shape, entrypoint, permissions, `agents.md`, build output, and declared
-agent tools. Run it after a fresh `build` — it asserts tool names appear in
-`dist/`.
+PureDesktop validates `plugin.json` when loading the app. Factory also checks
+the build and running iframe during app-development tasks.
 
 ## Project layout
 
