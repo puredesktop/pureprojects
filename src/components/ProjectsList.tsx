@@ -3,6 +3,7 @@ import {
   Cell,
   DragZone,
   HeaderRow,
+  ListCard,
   Mono,
   Row,
   RowMeta,
@@ -75,7 +76,7 @@ export function ProjectsList({
   }
 
   return (
-    <>
+    <ListCard aria-label="Projects">
       <HeaderRow>
         <div>Project</div>
         <div>Status</div>
@@ -150,7 +151,7 @@ export function ProjectsList({
                   {project.area ? <span>{project.area}</span> : null}
                   {total > 0 ? (
                     <>
-                      <span aria-hidden="true">·</span>
+                      {project.area ? <span aria-hidden="true">·</span> : null}
                       <span>
                         {done} of {total} deliverables
                       </span>
@@ -210,6 +211,6 @@ export function ProjectsList({
           )
         })}
       </Scroll>
-    </>
+    </ListCard>
   )
 }

@@ -86,6 +86,7 @@ import { DevThemeFallback } from './components/DevThemeFallback'
 import { DocumentPicker } from './components/DocumentPicker'
 import { DocumentEditorOverlay } from './components/DocumentEditorOverlay'
 import { NameDocumentDialog } from './components/NameDocumentDialog'
+import { MenuSelect } from './components/MenuSelect'
 import { ProjectsList } from './components/ProjectsList'
 import {
   Attention,
@@ -95,7 +96,6 @@ import {
   Footer,
   Main,
   Search,
-  SortSelect,
   Shell,
   Spacer,
   Toolbar,
@@ -1095,45 +1095,37 @@ export function App(): React.ReactElement {
                 placeholder="Search projects, people, documents"
                 onChange={event => setQuery(event.target.value)}
               />
-              <SortSelect
-                aria-label="View"
+              <MenuSelect
+                label="View"
                 value={filter}
-                onChange={event => setFilter(event.target.value as RailFilter)}
-              >
-                {viewOptions.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {option.label} ({option.count})
-                  </option>
-                ))}
-              </SortSelect>
+                options={viewOptions.map(option => ({
+                  value: option.id as RailFilter,
+                  label: `${option.label} (${option.count})`,
+                }))}
+                onChange={setFilter}
+              />
               {areas.length > 0 ? (
-                <SortSelect
-                  aria-label="Area"
+                <MenuSelect
+                  label="Area"
                   value={area ?? ''}
-                  onChange={event => setArea(event.target.value || null)}
-                >
-                  <option value="">All areas</option>
-                  {areas.map(name => (
-                    <option key={name} value={name}>
-                      {name} (
-                      {living.filter(project => project.area === name).length})
-                    </option>
-                  ))}
-                </SortSelect>
+                  options={[
+                    { value: '', label: 'All areas' },
+                    ...areas.map(name => ({
+                      value: name,
+                      label: `${name} (${living.filter(project => project.area === name).length})`,
+                    })),
+                  ]}
+                  onChange={value => setArea(value || null)}
+                />
               ) : null}
-              <SortSelect
-                aria-label="Sort projects"
+              <MenuSelect
+                label="Sort projects"
                 value={sort}
-                onChange={event => setSort(event.target.value as ProjectSort)}
-              >
-                {(
-                  Object.keys(PROJECT_SORT_LABELS) as ProjectSort[]
-                ).map(key => (
-                  <option key={key} value={key}>
-                    {PROJECT_SORT_LABELS[key]}
-                  </option>
-                ))}
-              </SortSelect>
+                options={(Object.keys(PROJECT_SORT_LABELS) as ProjectSort[]).map(
+                  key => ({ value: key, label: PROJECT_SORT_LABELS[key] }),
+                )}
+                onChange={setSort}
+              />
               <Button
                 $primary
                 onClick={() => {
