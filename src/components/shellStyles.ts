@@ -37,8 +37,22 @@ export const Shell = styled.div`
 
 /** The list's control row: search, sort, New — the platform toolbar. */
 export const Toolbar = styled.div.attrs(chrome('toolbar'))`
-  gap: 12px;
+  gap: 8px;
+  height: 52px;
   padding: 0 var(--pure-chrome-inset);
+  /* One size across the row: the search field, the menus and the buttons
+     share the field's height and radius (no pills beside a square field). */
+  > [data-chrome='toolbar-select'],
+  > button {
+    height: var(--pure-chrome-field-height);
+    border-radius: var(--pure-chrome-radius);
+    padding: 0 12px;
+    font-size: var(--platform-typography-font-size-sm, 13px);
+  }
+  > [data-chrome='field'] {
+    height: var(--pure-chrome-field-height);
+    border-radius: var(--pure-chrome-radius);
+  }
   /* The list card below is the one surface; the toolbar floats above it
      on the same wallpaper rather than drawing its own band. */
   background: transparent;
