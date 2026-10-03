@@ -82,7 +82,7 @@ export function ProjectsList({
         <div>Status</div>
         <div>Next action</div>
         <div>People</div>
-        <div style={{ textAlign: 'right' }}>Due</div>
+        <div data-project-field="due" style={{ textAlign: 'right' }}>Due</div>
       </HeaderRow>
       <Scroll>
         {projects.map(project => {
@@ -145,7 +145,7 @@ export function ProjectsList({
                   onClick={() => onSelect(project.id)}
                 />
               ) : null}
-              <div style={{ minWidth: 0 }}>
+              <div data-project-field="identity" style={{ minWidth: 0 }}>
                 <RowTitle>{project.name}</RowTitle>
                 <RowMeta>
                   {project.area ? <span>{project.area}</span> : null}
@@ -159,7 +159,7 @@ export function ProjectsList({
                   ) : null}
                 </RowMeta>
               </div>
-              <div>
+              <div data-project-field="status">
                 <StatusChip $status={project.status} $overdue={overdue}>
                   {overdue ? 'Overdue' : project.status}
                   {/* The count rides the chip: a fixed position that reads
@@ -170,7 +170,7 @@ export function ProjectsList({
                 </StatusChip>
               </div>
               {project.waitingOn.length > 0 ? (
-                <Cell $tone="warn">
+                <Cell data-project-field="action" $tone="warn">
                   {(() => {
                     const { lines, overflow } = waitingLines(project)
                     return (
@@ -184,20 +184,20 @@ export function ProjectsList({
                   })()}
                 </Cell>
               ) : project.status === 'done' ? (
-                <Cell $tone="muted">
+                <Cell data-project-field="action" $tone="muted">
                   Closed{project.closedAt ? ` ${shortDate(project.closedAt)}` : ''}
                 </Cell>
               ) : hasNoNextAction(project) ? (
-                <Cell $tone="muted" style={{ fontStyle: 'italic' }}>
+                <Cell data-project-field="action" $tone="muted" style={{ fontStyle: 'italic' }}>
                   No next action
                 </Cell>
               ) : (
-                <Cell $tone={overdue ? 'danger' : 'default'}>
+                <Cell data-project-field="action" $tone={overdue ? 'danger' : 'default'}>
                   {project.nextAction || '—'}
                 </Cell>
               )}
-              <Cell>{project.people.length ? project.people.join(', ') : 'You'}</Cell>
-              <div style={{ textAlign: 'right' }}>
+              <Cell data-project-field="people">{project.people.length ? project.people.join(', ') : 'You'}</Cell>
+              <div data-project-field="due" style={{ textAlign: 'right' }}>
                 <Cell $tone={dueTone} style={{ textAlign: 'right' }}>
                   <Mono>{relativeDue(project.dueAt, now)}</Mono>
                 </Cell>

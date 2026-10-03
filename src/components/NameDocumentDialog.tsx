@@ -20,7 +20,7 @@ export interface NameDocumentDialogProps {
   open: boolean
   projectName: string
   onClose: () => void
-  onCreate: (title: string) => void
+  onCreate: (title: string) => Promise<void>
 }
 
 /**
@@ -35,49 +35,75 @@ export function NameDocumentDialog({
   onCreate,
 }: NameDocumentDialogProps): React.ReactElement {
   const [title, setTitle] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (open) setTitle('')
+    if (open) {
+      setTitle('')
+      setError(null)
+    }
   }, [open])
 
-  const submit = (): void => {
+  const submit = async (): Promise<void> => {
     const trimmed = title.trim()
-    if (!trimmed) return
-    onCreate(trimmed)
-    onClose()
+    if (!trimmed || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onCreate(trimmed)
+      onClose()
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'The document was not created.',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!saving) onClose()
+      }}
       title="New document"
       size="sm"
       footer={
         <div style={{ display: 'flex', gap: 8, width: '100%' }}>
           <span style={{ flex: 1 }} />
-          <Button onClick={onClose}>Cancel</Button>
-          <Button $primary disabled={!title.trim()} onClick={submit}>
+          <Button disabled={saving} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            $primary
+            disabled={saving || !title.trim()}
+            onClick={() => void submit()}
+          >
             Create and open
           </Button>
         </div>
       }
     >
+      {error ? <p role="alert">{error}</p> : null}
       <Fields>
-      <FormField
-        label="Title"
-        hint={`Saved to PureDocuments as a .document package, linked to ${projectName}.`}
-      >
-        <TextField
-          value={title}
-          autoFocus
-          placeholder="e.g. Trust deed notes"
-          onChange={event => setTitle(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter') submit()
-          }}
-        />
-      </FormField>
+        <FormField
+          label="Title"
+          hint={`Saved to PureDocuments as a .document package, linked to ${projectName}.`}
+        >
+          <TextField
+            value={title}
+            autoFocus
+            placeholder="e.g. Trust deed notes"
+            onChange={event => setTitle(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') void submit()
+            }}
+          />
+        </FormField>
       </Fields>
     </Modal>
   )

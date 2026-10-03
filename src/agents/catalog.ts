@@ -84,7 +84,7 @@ export interface ProjectsAgentToolContext {
    * the same schema the reader mounts, so an agent cannot write markup the
    * document would then refuse to show.
    */
-  documentExtensions: () => Extensions
+  documentExtensions: () => Extensions | Promise<Extensions>
   /** Print documents to PDF beside their packages; returns what was written. */
   exportDocumentsPdf: (
     projectId: string,

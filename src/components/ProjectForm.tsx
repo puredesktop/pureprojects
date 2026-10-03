@@ -48,8 +48,8 @@ export interface ProjectFormProps {
   project?: Project | null
   areaSuggestions: string[]
   onClose: () => void
-  onSubmit: (values: ProjectFormValues) => void
-  onDelete?: () => void
+  onSubmit: (values: ProjectFormValues) => Promise<void>
+  onDelete?: () => Promise<void>
 }
 
 export function ProjectForm({
@@ -68,6 +68,8 @@ export function ProjectForm({
   const [dueAt, setDueAt] = useState('')
   const [people, setPeople] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Re-seed whenever the dialog opens so an edit never shows the last
   // project's values, and a cancelled edit leaves nothing behind.
@@ -76,34 +78,64 @@ export function ProjectForm({
     setName(project?.name ?? '')
     setSummary(project?.summary ?? '')
     setArea(project?.area ?? '')
-    setStatus(project && project.status !== 'waiting' ? project.status : 'active')
+    setStatus(
+      project && project.status !== 'waiting' ? project.status : 'active',
+    )
     setNextAction(project?.nextAction ?? '')
     setDueAt(project?.dueAt ? project.dueAt.slice(0, 10) : '')
     setPeople((project?.people ?? []).join(', '))
     setConfirmingDelete(false)
+    setError(null)
   }, [open, project])
 
-  const submit = (): void => {
+  const submit = async (): Promise<void> => {
     const trimmed = name.trim()
-    if (!trimmed) return
-    onSubmit({
-      name: trimmed,
-      summary: summary.trim(),
-      area: area.trim(),
-      status,
-      nextAction: nextAction.trim(),
-      dueAt: dueAt.trim(),
-      people: people
-        .split(',')
-        .map(person => person.trim())
-        .filter(Boolean),
-    })
+    if (!trimmed || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onSubmit({
+        name: trimmed,
+        summary: summary.trim(),
+        area: area.trim(),
+        status,
+        nextAction: nextAction.trim(),
+        dueAt: dueAt.trim(),
+        people: people
+          .split(',')
+          .map(person => person.trim())
+          .filter(Boolean),
+      })
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'The project was not saved.',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!onDelete || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onDelete()
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'The project was not deleted.',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!saving) onClose()
+      }}
       title={project ? 'Edit project' : 'New project'}
       size="md"
       footer={
@@ -111,12 +143,7 @@ export function ProjectForm({
           {project && onDelete ? (
             confirmingDelete ? (
               <>
-                <Button
-                  onClick={() => {
-                    onDelete()
-                    onClose()
-                  }}
-                >
+                <Button disabled={saving} onClick={() => void remove()}>
                   Delete permanently
                 </Button>
                 <Button onClick={() => setConfirmingDelete(false)}>Keep</Button>
@@ -126,13 +153,20 @@ export function ProjectForm({
             )
           ) : null}
           <span style={{ flex: 1 }} />
-          <Button onClick={onClose}>Cancel</Button>
-          <Button $primary onClick={submit} disabled={!name.trim()}>
+          <Button disabled={saving} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            $primary
+            onClick={() => void submit()}
+            disabled={saving || !name.trim()}
+          >
             {project ? 'Save changes' : 'Create project'}
           </Button>
         </Actions>
       }
     >
+      {error ? <p role="alert">{error}</p> : null}
       <Grid>
         <Wide>
           <FormField label="Name">
@@ -149,7 +183,10 @@ export function ProjectForm({
         </Wide>
 
         <Wide>
-          <FormField label="Summary" hint="One or two sentences — what this is, for whom.">
+          <FormField
+            label="Summary"
+            hint="One or two sentences — what this is, for whom."
+          >
             <TextAreaField
               rows={2}
               value={summary}
@@ -171,7 +208,10 @@ export function ProjectForm({
           </FormField>
         </Wide>
 
-        <FormField label="Area" hint={areaSuggestions.join(' · ') || 'e.g. Writing, Clients'}>
+        <FormField
+          label="Area"
+          hint={areaSuggestions.join(' · ') || 'e.g. Writing, Clients'}
+        >
           <TextField
             value={area}
             list="pureprojects-areas"
@@ -184,7 +224,10 @@ export function ProjectForm({
           </datalist>
         </FormField>
 
-        <FormField label="Status" hint="Waiting is set by naming who you are waiting on.">
+        <FormField
+          label="Status"
+          hint="Waiting is set by naming who you are waiting on."
+        >
           <SelectField
             value={status}
             options={STATUS_OPTIONS}

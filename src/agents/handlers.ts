@@ -198,15 +198,14 @@ async function withProject(
     }
   }
   const nowIso = context.now().toISOString()
-  let updated: Project | undefined
-  await context.mutate((store: ProjectsStore) => ({
-    ...store,
-    projects: store.projects.map(project => {
-      if (project.id !== projectId) return project
-      updated = change(project, nowIso)
-      return updated
-    }),
-  }))
+  const saved = await context.mutate((store: ProjectsStore) => {
+    if (!findProject(store, projectId)) throw new Error('The project no longer exists. Call listProjects for current ids.')
+    return {
+      ...store,
+      projects: store.projects.map(project => project.id === projectId ? change(project, nowIso) : project),
+    }
+  })
+  const updated = findProject(saved, projectId)
   if (!updated) return { ok: false, error: 'the project could not be updated' }
   context.focusProject(projectId)
   return { ok: true, project: updated }
@@ -649,7 +648,7 @@ export async function readDocumentHandler(
 ): Promise<AgentToolHandlerResult> {
   const found = await requireLinkedDocument(context, args)
   if (isHandlerResult(found)) return found
-  const blocks = readDocumentBlocks(context.documentExtensions(), found.html)
+  const blocks = readDocumentBlocks(await context.documentExtensions(), found.html)
   return {
     content: formatAgentToolJson({
       path: found.path,
@@ -675,7 +674,7 @@ async function commitDocument(
       `could not write ${path}: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
-  const blocks = readDocumentBlocks(context.documentExtensions(), html)
+  const blocks = readDocumentBlocks(await context.documentExtensions(), html)
   return {
     content: formatAgentToolJson({
       path,
@@ -713,7 +712,7 @@ export async function insertDocumentBlockHandler(
     context,
     found.path,
     insertDocumentBlock(
-      context.documentExtensions(),
+      await context.documentExtensions(),
       found.html,
       markup,
       position,
@@ -739,7 +738,7 @@ export async function replaceDocumentBlockHandler(
     context,
     found.path,
     replaceDocumentBlock(
-      context.documentExtensions(),
+      await context.documentExtensions(),
       found.html,
       index,
       mermaid ? mermaidBlockHtml(mermaid) : (html as string),
@@ -759,7 +758,7 @@ export async function deleteDocumentBlockHandler(
   return commitDocument(
     context,
     found.path,
-    deleteDocumentBlock(context.documentExtensions(), found.html, index),
+    deleteDocumentBlock(await context.documentExtensions(), found.html, index),
     `no block ${index} in ${found.path} — call readDocument for current indexes`,
   )
 }
