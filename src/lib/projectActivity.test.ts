@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PlatformOperation } from '../bridge/platformBridge'
 import {
+  mergeOperations,
   activityLabel,
   activityWhen,
   journalDraftFromActivity,
@@ -33,12 +34,17 @@ describe('reading a project name out of a ledger summary', () => {
   })
 
   it('trims a quoted project name', () => {
-    expect(activityLabel('Updated “Trust Admin”', 'Trust Admin')).toBe('Updated')
+    expect(activityLabel('Updated “Trust Admin”', 'Trust Admin')).toBe(
+      'Updated',
+    )
   })
 
   it('trims a leading project name and recapitalises', () => {
     expect(
-      activityLabel('Trust Admin is no longer waiting on anyone', 'Trust Admin'),
+      activityLabel(
+        'Trust Admin is no longer waiting on anyone',
+        'Trust Admin',
+      ),
     ).toBe('Is no longer waiting on anyone')
   })
 
@@ -98,5 +104,28 @@ describe('promoting an action into the journal', () => {
       lane: 'user',
     })
     expect(draft).toEqual({ title: 'A wait cleared', body: '' })
+  })
+})
+
+describe('bounded live history', () => {
+  it('keeps a live event received while the initial page loads, deduplicates, and sorts newest first', () => {
+    const live = op({ id: 'live', at: '2026-10-03T00:00:00Z' })
+    const page = op({ id: 'page', at: '2026-10-02T00:00:00Z' })
+    expect(mergeOperations([live], [page, live]).map(item => item.id)).toEqual([
+      'live',
+      'page',
+    ])
+  })
+  it('bounds memory after hundreds of live events', () => {
+    const items = Array.from({ length: 600 }, (_, i) =>
+      op({ id: String(i), at: new Date(i * 1000).toISOString() }),
+    )
+    const result = mergeOperations(
+      [op({ id: 'latest', at: '2026-10-03T00:00:00Z' })],
+      items,
+    )
+    expect(result).toHaveLength(400)
+    expect(result[0].id).toBe('latest')
+    expect(result.at(-1)?.id).toBe('201')
   })
 })

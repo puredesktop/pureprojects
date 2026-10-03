@@ -3,9 +3,11 @@ import { defineConfig } from 'vite'
 import { appDevServerFromManifest } from '../../scripts/vite/app-server.mjs'
 
 export default defineConfig({
+  resolve: { dedupe: ['react', 'react-dom', 'styled-components'] },
   plugins: [
     react({
-      plugins: [['@swc/plugin-styled-components', { displayName: true, fileName: true }]],
+      resolve: { dedupe: ['react', 'react-dom', 'styled-components'] },
+  plugins: [['@swc/plugin-styled-components', { displayName: true, fileName: true }]],
     }),
   ],
   server: appDevServerFromManifest(import.meta.url),

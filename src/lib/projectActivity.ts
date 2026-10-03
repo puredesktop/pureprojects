@@ -1,6 +1,20 @@
 import type { PlatformOperation } from '../bridge/platformBridge'
 import { PROJECTS_APP_SLUG } from '../constants'
 
+/** Merge a ledger page with live events without losing events received during the read. */
+export function mergeOperations(
+  newest: PlatformOperation[],
+  older: PlatformOperation[],
+): PlatformOperation[] {
+  const byId = new Map<string, PlatformOperation>()
+  for (const operation of [...newest, ...older]) {
+    if (!byId.has(operation.id)) byId.set(operation.id, operation)
+  }
+  return [...byId.values()]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 400)
+}
+
 /**
  * The activity list is a READ of the operations ledger, not a second
  * store: every mutation here already records an entry carrying

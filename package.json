@@ -10,16 +10,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@purescience/platform-bridge": "file:../../packages/bridge",
     "@purescience/platform-editor": "file:../../packages/editor",
     "@purescience/platform-ui": "file:../../packages/ui",
     "jszip": "^3.10.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "styled-components": "^6.1.19",
-    "@purescience/platform-bridge": "file:../../packages/bridge"
+    "styled-components": "^6.1.19"
   },
   "devDependencies": {
-    "@swc/plugin-styled-components": "^12.9.0",
+    "@swc/core": "1.16.1",
+    "@swc/plugin-styled-components": "13.0.0",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react-swc": "^3.10.2",
