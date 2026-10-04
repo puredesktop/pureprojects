@@ -30,6 +30,7 @@ export const Shell = styled.div`
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  container: projects / inline-size;
   background: var(--platform-colors-bg);
   color: var(--platform-colors-text);
   font-size: var(--platform-typography-font-size-base, 14.5px);
@@ -38,8 +39,13 @@ export const Shell = styled.div`
 /** The list's control row: search, sort, New — the platform toolbar. */
 export const Toolbar = styled.div.attrs(chrome('toolbar'))`
   gap: 8px;
-  height: 52px;
-  padding: 0 var(--pure-chrome-inset);
+  && {
+    min-height: 52px;
+    height: auto;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    padding: 8px var(--pure-chrome-inset);
+  }
   /* One size across the row: the search field, the menus and the buttons
      share the field's height and radius (no pills beside a square field). */
   > [data-chrome='toolbar-select'],
@@ -48,6 +54,8 @@ export const Toolbar = styled.div.attrs(chrome('toolbar'))`
     border-radius: var(--pure-chrome-radius);
     padding: 0 12px;
     font-size: var(--platform-typography-font-size-sm, 13px);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   > [data-chrome='field'] {
     height: var(--pure-chrome-field-height);
@@ -61,6 +69,11 @@ export const Toolbar = styled.div.attrs(chrome('toolbar'))`
 
 export const Search = styled.input.attrs(chrome('field'))`
   width: 292px;
+  max-width: 100%;
+  @container projects (max-width: 760px) {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
 `
 
 export const SortSelect = styled.select.attrs(chrome('toolbar-select'))`
@@ -137,6 +150,7 @@ const rowGrid = css`
 
 export const HeaderRow = styled.div`
   ${rowGrid};
+  @container projects (max-width: 760px) { display: none; }
   min-height: 0;
   padding-top: 10px;
   padding-bottom: 10px;
@@ -157,6 +171,17 @@ export const Row = styled.button<{
   $dragging?: boolean
 }>`
   ${rowGrid};
+  @container projects (max-width: 760px) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'identity status' 'action action' 'people due';
+    gap: 6px 16px;
+    > [data-project-field='identity'] { grid-area: identity; }
+    > [data-project-field='status'] { grid-area: status; }
+    > [data-project-field='action'] { grid-area: action; }
+    > [data-project-field='people'] { grid-area: people; }
+    > [data-project-field='due'] { grid-area: due; }
+  }
+
   position: relative;
   width: 100%;
   opacity: ${({ $dragging }) => ($dragging ? 0.4 : 1)};

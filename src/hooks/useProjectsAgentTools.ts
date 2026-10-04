@@ -6,31 +6,7 @@ import {
   PUREPROJECTS_AGENT_TOOL_NAMES,
   type ProjectsAgentToolContext,
 } from '../agents/catalog'
-import {
-  addDeliverableHandler,
-  createDocumentHandler,
-  deleteDocumentBlockHandler,
-  exportDocumentsPdfHandler,
-  exportProjectZipHandler,
-  reorderProjectHandler,
-  insertDocumentBlockHandler,
-  readDocumentHandler,
-  replaceDocumentBlockHandler,
-  createProjectHandler,
-  archiveProjectHandler,
-  deleteProjectHandler,
-  getProjectHandler,
-  getProjectsContextHandler,
-  linkDocumentHandler,
-  listProjectsHandler,
-  logJournalEntryHandler,
-  moveDeliverableHandler,
-  removeDeliverableHandler,
-  removeLinkHandler,
-  setWaitingOnHandler,
-  updateDeliverableHandler,
-  updateProjectHandler,
-} from '../agents/handlers'
+// Loading document tooling is deferred until a tool is invoked.
 
 export function useProjectsAgentTools(
   ready: boolean,
@@ -45,51 +21,120 @@ export function useProjectsAgentTools(
     logLabel: PUREPROJECTS_AGENT_LOG_LABEL,
     errorType: AgentProjectsToolError,
     handlers: {
-      getProjectsContext: async () => getProjectsContextHandler(contextRef.current),
+      getProjectsContext: async () =>
+        (await import('../agents/handlers')).getProjectsContextHandler(
+          contextRef.current,
+        ),
       listProjects: async invoke =>
-        listProjectsHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).listProjectsHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       getProject: async invoke =>
-        getProjectHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).getProjectHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       createProject: async invoke =>
-        createProjectHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).createProjectHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       updateProject: async invoke =>
-        updateProjectHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).updateProjectHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       addDeliverable: async invoke =>
-        addDeliverableHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).addDeliverableHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       updateDeliverable: async invoke =>
-        updateDeliverableHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).updateDeliverableHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       setWaitingOn: async invoke =>
-        setWaitingOnHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).setWaitingOnHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       logJournalEntry: async invoke =>
-        logJournalEntryHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).logJournalEntryHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       createDocument: async invoke =>
-        createDocumentHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).createDocumentHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       readDocument: async invoke =>
-        readDocumentHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).readDocumentHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       insertDocumentBlock: async invoke =>
-        insertDocumentBlockHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).insertDocumentBlockHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       replaceDocumentBlock: async invoke =>
-        replaceDocumentBlockHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).replaceDocumentBlockHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       deleteDocumentBlock: async invoke =>
-        deleteDocumentBlockHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).deleteDocumentBlockHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       exportDocumentsPdf: async invoke =>
-        exportDocumentsPdfHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).exportDocumentsPdfHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       exportProjectZip: async invoke =>
-        exportProjectZipHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).exportProjectZipHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       reorderProject: async invoke =>
-        reorderProjectHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).reorderProjectHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       linkDocument: async invoke =>
-        linkDocumentHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).linkDocumentHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       removeLink: async invoke =>
-        removeLinkHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).removeLinkHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       removeDeliverable: async invoke =>
-        removeDeliverableHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).removeDeliverableHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       moveDeliverable: async invoke =>
-        moveDeliverableHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).moveDeliverableHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       archiveProject: async invoke =>
-        archiveProjectHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).archiveProjectHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
       deleteProject: async invoke =>
-        deleteProjectHandler(contextRef.current, invoke.arguments ?? {}),
+        (await import('../agents/handlers')).deleteProjectHandler(
+          contextRef.current,
+          invoke.arguments ?? {},
+        ),
     },
   })
 }

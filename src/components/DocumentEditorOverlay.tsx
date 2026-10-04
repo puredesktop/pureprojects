@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Modal } from '@purescience/platform-ui/components/common/overlays/Modal'
 import {
   DocumentEditor,
   useEditorExtensions,
 } from '@purescience/platform-editor'
+import { DocumentSaveQueue } from '../lib/documentSaveQueue'
 import { Button, Mono, chrome } from './shellStyles'
 
 const Frame = styled.div`
@@ -27,9 +28,13 @@ const Frame = styled.div`
   }
 `
 
-const Status = styled.span.attrs(chrome('meta'))<{ $tone?: 'muted' | 'danger' }>`
+const Status = styled.span.attrs(chrome('meta'))<{
+  $tone?: 'muted' | 'danger'
+}>`
   ${({ $tone }) =>
-    $tone === 'danger' ? '&& { color: var(--platform-colors-semantic-red-text); }' : ''}
+    $tone === 'danger'
+      ? '&& { color: var(--platform-colors-semantic-red-text); }'
+      : ''}
 `
 
 const Loading = styled.div`
@@ -51,7 +56,7 @@ export interface DocumentEditorOverlayProps {
   onClose: () => void
   onRead: (packagePath: string) => Promise<string>
   onWrite: (packagePath: string, html: string) => Promise<void>
-  onOpenInWriter: (packagePath: string) => void
+  onOpenInWriter: (packagePath: string) => void | Promise<unknown>
 }
 
 /**
@@ -60,130 +65,209 @@ export interface DocumentEditorOverlayProps {
  * exactly what is edited here — this is a second window onto one document,
  * never a second copy of it.
  */
-export function DocumentEditorOverlay({
-  open,
+export function DocumentEditorOverlay(
+  props: DocumentEditorOverlayProps,
+): React.ReactElement | null {
+  if (!props.open || !props.packagePath) return null
+  // Pending edits belong to the path that was opened, never the next document.
+  return (
+    <DocumentSession
+      key={props.packagePath}
+      {...props}
+      packagePath={props.packagePath}
+    />
+  )
+}
+
+function DocumentSession({
   packagePath,
   label,
   onClose,
   onRead,
   onWrite,
   onOpenInWriter,
-}: DocumentEditorOverlayProps): React.ReactElement {
+}: DocumentEditorOverlayProps & { packagePath: string }): React.ReactElement {
   const [html, setHtml] = useState<string | null>(null)
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle',
+  )
   const [error, setError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const [leaving, setLeaving] = useState(false)
+  const leavingRef = useRef(false)
+  const mounted = useRef(true)
   const timerRef = useRef<number | null>(null)
-  const pendingRef = useRef<string | null>(null)
+  const readRef = useRef(onRead)
+  const writeRef = useRef(onWrite)
+  readRef.current = onRead
+  writeRef.current = onWrite
+  const saves = useMemo(
+    () =>
+      new DocumentSaveQueue(content => writeRef.current(packagePath, content)),
+    [packagePath],
+  )
   const extensions = useEditorExtensions({ placeholder: 'Start writing…' })
 
   useEffect(() => {
-    if (!open || !packagePath) return
     let cancelled = false
     setHtml(null)
     setError(null)
     setStatus('idle')
-    void (async () => {
-      try {
-        const content = await onRead(packagePath)
+    void readRef
+      .current(packagePath)
+      .then(content => {
         if (!cancelled) setHtml(content)
-      } catch (readError) {
+      })
+      .catch(readError => {
         if (!cancelled) {
           setError(
-            readError instanceof Error ? readError.message : 'the document could not be read',
+            readError instanceof Error
+              ? readError.message
+              : 'The document could not be read.',
           )
-          setHtml('')
+          setStatus('error')
+          // Never mount an editable empty document after a failed read.
         }
-      }
-    })()
+      })
     return () => {
       cancelled = true
     }
-  }, [open, packagePath, onRead])
+  }, [packagePath, retry])
 
   const flush = useCallback(async () => {
-    const pending = pendingRef.current
-    if (!packagePath || pending === null) return
-    pendingRef.current = null
-    setStatus('saving')
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    timerRef.current = null
+    if (saves.dirty) setStatus('saving')
     try {
-      await onWrite(packagePath, pending)
-      setStatus('saved')
-      setError(null)
+      await saves.flush()
+      if (mounted.current) {
+        setStatus('saved')
+        setError(null)
+      }
     } catch (writeError) {
-      setStatus('error')
-      setError(
-        writeError instanceof Error ? writeError.message : 'that edit was not saved',
-      )
+      if (mounted.current) {
+        setStatus('error')
+        setError(
+          writeError instanceof Error
+            ? writeError.message
+            : 'That edit was not saved.',
+        )
+      }
+      throw writeError
     }
-  }, [packagePath, onWrite])
+  }, [saves])
 
   const onChange = useCallback(
     (content: string) => {
-      pendingRef.current = content
+      if (leavingRef.current) return
+      saves.change(content)
       setStatus('saving')
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
       timerRef.current = window.setTimeout(() => {
-        timerRef.current = null
-        void flush()
+        void flush().catch(() => {})
       }, SAVE_DEBOUNCE_MS)
     },
-    [flush],
+    [saves, flush],
   )
 
-  // A debounced write that never lands is a lost edit: closing the overlay
-  // flushes whatever is pending rather than dropping it on unmount.
-  const close = useCallback(() => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    void flush().finally(onClose)
-  }, [flush, onClose])
+  const leave = useCallback(
+    async (writer: boolean) => {
+      if (leavingRef.current) return
+      leavingRef.current = true
+      setLeaving(true)
+      try {
+        await flush()
+        if (writer) await onOpenInWriter(packagePath)
+        onClose()
+      } catch (leaveError) {
+        setError(
+          leaveError instanceof Error
+            ? leaveError.message
+            : 'The document could not be saved or opened.',
+        )
+        setStatus('error')
+      } finally {
+        leavingRef.current = false
+        if (mounted.current) setLeaving(false)
+      }
+    },
+    [flush, onClose, onOpenInWriter, packagePath],
+  )
 
   useEffect(() => {
+    mounted.current = true
     return () => {
+      mounted.current = false
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+      // Parent teardown still writes to this session's captured path.
+      // Normal dismissal uses leave(), which stays open on failure.
+      void saves.flush().catch(() => {})
     }
-  }, [])
+  }, [saves])
 
   return (
     <Modal
-      open={open}
-      onClose={close}
+      open
+      onClose={() => void leave(false)}
       title={label}
-      // A document is read, not glanced at: xl is the widest size the modal
-      // offers short of fullscreen, and its paper keeps the same 72ch measure,
-      // so the extra width becomes margin around the text rather than longer
-      // lines to track back across.
       size="xl"
       footer={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            width: '100%',
+            flexWrap: 'wrap',
+          }}
+        >
           {error ? (
-            <Status $tone="danger">{error}</Status>
+            <Status $tone="danger" role="alert">
+              {error}
+            </Status>
           ) : (
             <Status>
-              {status === 'saving'
-                ? 'Saving…'
-                : status === 'saved'
-                  ? 'Saved'
-                  : packagePath
-                    ? <Mono>{packagePath}</Mono>
-                    : ''}
+              {status === 'saving' ? (
+                'Saving…'
+              ) : status === 'saved' ? (
+                'Saved'
+              ) : (
+                <Mono>{packagePath}</Mono>
+              )}
             </Status>
           )}
+          {status === 'error' && html !== null ? (
+            <Button
+              disabled={leaving}
+              onClick={() => void flush().catch(() => {})}
+            >
+              Retry save
+            </Button>
+          ) : null}
           <span style={{ flex: 1 }} />
-          <Button onClick={() => packagePath && onOpenInWriter(packagePath)}>
+          <Button
+            disabled={leaving || html === null}
+            onClick={() => void leave(true)}
+          >
             Open in Writer
           </Button>
-          <Button $primary onClick={close}>
-            Done
+          <Button $primary disabled={leaving} onClick={() => void leave(false)}>
+            {leaving ? 'Saving…' : 'Done'}
           </Button>
         </div>
       }
     >
       <Frame>
         {html === null ? (
-          <Loading>Opening the document…</Loading>
+          <Loading>
+            {error ? (
+              <Button onClick={() => setRetry(value => value + 1)}>
+                Retry opening document
+              </Button>
+            ) : (
+              'Opening the document…'
+            )}
+          </Loading>
         ) : (
           <DocumentEditor
             value={html}

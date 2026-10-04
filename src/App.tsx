@@ -1,4 +1,4 @@
-import { buildExtensions } from '@purescience/platform-editor'
+import type { Extensions } from '@tiptap/react'
 import {
   buildDocumentsZip,
   exportableDocuments,
@@ -7,7 +7,14 @@ import {
   zipNameFor,
   zipScratchPdfPath,
 } from './lib/documentExport'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  lazy,
+  Suspense,
+  useMemo,
+  useState,
+} from 'react'
 import { AppFrame } from '@purescience/platform-bridge/components/AppFrame'
 import { EmptyState } from '@purescience/platform-ui/components/common/feedback/EmptyState'
 import { usePlatformBridge } from '@purescience/platform-ui/bridge/react/usePlatformBridge'
@@ -31,7 +38,8 @@ import {
   writeAppStorageJson,
 } from './bridge/platformBridge'
 import type { PlatformOperation } from './bridge/platformBridge'
-import { projectActivity } from './lib/projectActivity'
+import { useProjectPersistence } from './hooks/useProjectPersistence'
+import { mergeOperations, projectActivity } from './lib/projectActivity'
 import { PROJECTS_APP_SLUG } from './constants'
 import { useProjectsAgentTools } from './hooks/useProjectsAgentTools'
 import { findProject } from './agents/catalog'
@@ -50,7 +58,6 @@ import {
   addDeliverable,
   createProject,
   editJournalEntry,
-  emptyStore,
   applyManualOrder,
   archiveProject,
   archivedProjects,
@@ -84,7 +91,6 @@ import { ProjectDetail } from './components/ProjectDetail'
 import { ProjectForm, type ProjectFormValues } from './components/ProjectForm'
 import { DevThemeFallback } from './components/DevThemeFallback'
 import { DocumentPicker } from './components/DocumentPicker'
-import { DocumentEditorOverlay } from './components/DocumentEditorOverlay'
 import { NameDocumentDialog } from './components/NameDocumentDialog'
 import { MenuSelect } from './components/MenuSelect'
 import { ProjectsList } from './components/ProjectsList'
@@ -100,8 +106,14 @@ import {
   Spacer,
   Toolbar,
 } from './components/shellStyles'
-import type { Deliverable, Project, ProjectLink, ProjectsStore } from './types'
+import type { Deliverable, Project, ProjectLink } from './types'
 import type { ProjectSort } from './lib/projectModel'
+
+const DocumentEditorOverlay = lazy(() =>
+  import('./components/DocumentEditorOverlay').then(module => ({
+    default: module.DocumentEditorOverlay,
+  })),
+)
 
 /** Long enough for a slow boot, short enough not to look hung. */
 const BOOT_TIMEOUT_MS = 8000
@@ -126,13 +138,9 @@ export function App(): React.ReactElement {
    * throws it away. That is how documents were lost.
    */
   const bridgeLive = ready
-  const bridgeLiveRef = useRef(bridgeLive)
-  bridgeLiveRef.current = bridgeLive
 
-  const [store, setStore] = useState<ProjectsStore>(emptyStore)
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [writeError, setWriteError] = useState<string | null>(null)
   // Results worth confirming — a zip written, PDFs printed. Kept apart from
   // writeError so a success never arrives in alarm colours.
   const [statusNote, setStatusNote] = useState<string | null>(null)
@@ -147,9 +155,10 @@ export function App(): React.ReactElement {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [editingDoc, setEditingDoc] = useState<{ path: string; label: string } | null>(
-    null,
-  )
+  const [editingDoc, setEditingDoc] = useState<{
+    path: string
+    label: string
+  } | null>(null)
   const [namingDocument, setNamingDocument] = useState(false)
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
 
@@ -167,6 +176,27 @@ export function App(): React.ReactElement {
     [],
   )
 
+  const {
+    store,
+    storeRef,
+    setStore,
+    refresh,
+    mutate,
+    writeError,
+    setWriteError,
+  } = useProjectPersistence(projectStore, standalone)
+  const runUserAction = useCallback(
+    (action: Promise<unknown>): void => {
+      void action.catch(error =>
+        setWriteError(
+          current =>
+            current ?? (error instanceof Error ? error.message : String(error)),
+        ),
+      )
+    },
+    [setWriteError],
+  )
+
   useEffect(() => {
     if (!usable) return
     // A plain browser tab has no shell, so no storage bridge ever answers.
@@ -178,17 +208,19 @@ export function App(): React.ReactElement {
       return
     }
     let cancelled = false
+    let timeout: number | undefined
     void (async () => {
       try {
         // A bridge that never answers must not wedge the app on a
         // spinner: fail visibly instead, so the state is readable.
         const loadedStore = await Promise.race([
           projectStore.load(),
-          new Promise<never>((_, reject) =>
-            window.setTimeout(
-              () => reject(new Error('the desktop did not answer in time')),
-              BOOT_TIMEOUT_MS,
-            ),
+          new Promise<never>(
+            (_, reject) =>
+              (timeout = window.setTimeout(
+                () => reject(new Error('the desktop did not answer in time')),
+                BOOT_TIMEOUT_MS,
+              )),
           ),
         ])
         if (!cancelled) {
@@ -197,86 +229,21 @@ export function App(): React.ReactElement {
         }
       } catch (error) {
         if (cancelled) return
-        // In dev the app is often opened outside the shell (a browser tab,
-        // a preview pane), where no bridge will ever answer. Fall back to
-        // sample projects there so the UI is workable; in a real build a
-        // failed read is a real failure and says so.
-        if (!bridgeLiveRef.current) {
-          setStore(devSampleStore(now))
-          setThemeless(true)
-          setLoadError(null)
-        } else {
-          setLoadError(
-            error instanceof Error ? error.message : 'the project store could not be read',
-          )
-        }
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : 'The project store could not be read.',
+        )
       } finally {
+        window.clearTimeout(timeout)
         if (!cancelled) setLoaded(true)
       }
     })()
     return () => {
       cancelled = true
+      window.clearTimeout(timeout)
     }
-  }, [usable, standalone, projectStore, now])
-
-  /**
-   * Apply a change locally first so the UI responds to the click, then
-   * persist. A write that fails is SURFACED rather than swallowed — the
-   * alternative is a control that silently does nothing, which reads as a
-   * broken app. The persisted store replaces the optimistic one on success,
-   * so a concurrent edit from another window still wins the reconcile.
-   */
-  // The latest store, for mutations that must not close over a stale render.
-  const storeRef = useRef(store)
-  storeRef.current = store
-
-  /**
-   * Re-read the persisted store. Two instances of this app can be open at
-   * once — delegation opens one in a background tab — and each holds its
-   * own snapshot, so anything that must be correct rather than merely
-   * fast reads through this first.
-   */
-  const refresh = useCallback(async (): Promise<ProjectsStore> => {
-    try {
-      const fresh = await projectStore.load()
-      setStore(fresh)
-      return fresh
-    } catch {
-      // A failed refresh must not blank the app; the snapshot still works.
-      return storeRef.current
-    }
-  }, [projectStore])
-
-  const mutate = useCallback(
-    async (fn: (current: ProjectsStore) => ProjectsStore): Promise<ProjectsStore> => {
-      const before = storeRef.current
-      const optimistic = fn(before)
-      setStore(optimistic)
-      try {
-        const persisted = await projectStore.update(fn)
-        setStore(persisted)
-        setWriteError(null)
-        return persisted
-      } catch (error) {
-        if (!bridgeLiveRef.current) {
-          // No shell at all (a plain browser tab): keeping the change in
-          // memory is what makes the app usable in a dev harness.
-          return optimistic
-        }
-        // A shell IS present and refused the write. Roll the UI back to
-        // what is actually on disk and say so — showing the change as if
-        // it had landed is how work disappears at the next restart.
-        setStore(before)
-        setWriteError(
-          error instanceof Error
-            ? `That change was not saved — ${error.message}`
-            : 'That change was not saved.',
-        )
-        return before
-      }
-    },
-    [projectStore],
-  )
+  }, [usable, standalone, projectStore, now, setStore])
 
   // The other instance (or the agent working in it) may have changed the
   // store while this window sat in the background. Re-read on focus so the
@@ -284,7 +251,7 @@ export function App(): React.ReactElement {
   useEffect(() => {
     if (!usable || standalone) return
     const onVisible = (): void => {
-      if (document.visibilityState === 'visible') void refresh()
+      if (document.visibilityState === 'visible') void refresh().catch(() => {})
     }
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
@@ -392,24 +359,22 @@ export function App(): React.ReactElement {
    */
   const [operations, setOperations] = useState<PlatformOperation[]>([])
   useEffect(() => {
+    if (!usable || standalone) return
     let cancelled = false
     void listOperations({ limit: 400 })
       .then(result => {
-        if (!cancelled) setOperations(result.operations)
+        if (!cancelled)
+          setOperations(current => mergeOperations(current, result.operations))
       })
       .catch(() => {})
     const unsubscribe = onOperationRecorded(operation => {
-      setOperations(current =>
-        current.some(item => item.id === operation.id)
-          ? current
-          : [operation, ...current],
-      )
+      setOperations(current => mergeOperations([operation], current))
     })
     return () => {
       cancelled = true
       unsubscribe()
     }
-  }, [])
+  }, [usable, standalone])
 
   const selectedActivity = useMemo(
     () =>
@@ -417,11 +382,7 @@ export function App(): React.ReactElement {
     [operations, selected],
   )
 
-  /**
-   * Every manual edit funnels through here so the ledger entry, the
-   * optimistic write and the persistence path are identical whichever
-   * control the user touched.
-   */
+  /** Manual edits record activity only after storage acknowledges the change. */
   const editProject = useCallback(
     async (
       projectId: string,
@@ -429,12 +390,18 @@ export function App(): React.ReactElement {
       operation?: { kind: string; summary: string },
     ) => {
       const nowIso = new Date().toISOString()
-      await mutate(current => ({
-        ...current,
-        projects: current.projects.map(project =>
-          project.id === projectId ? change(project, nowIso) : project,
-        ),
-      }))
+      await mutate(current => {
+        if (!current.projects.some(project => project.id === projectId))
+          throw new Error(
+            'This project no longer exists. Refresh your projects.',
+          )
+        return {
+          ...current,
+          projects: current.projects.map(project =>
+            project.id === projectId ? change(project, nowIso) : project,
+          ),
+        }
+      })
       if (operation) {
         void recordOperation({
           lane: 'user',
@@ -442,7 +409,7 @@ export function App(): React.ReactElement {
           summary: operation.summary,
           appSlug: PROJECTS_APP_SLUG,
           refs: { projectId },
-        })
+        }).catch(() => {})
       }
     },
     [mutate],
@@ -452,7 +419,9 @@ export function App(): React.ReactElement {
     async (values: ProjectFormValues) => {
       const nowIso = new Date().toISOString()
       if (editingProjectId) {
-        const existing = store.projects.find(item => item.id === editingProjectId)
+        const existing = store.projects.find(
+          item => item.id === editingProjectId,
+        )
         await editProject(
           editingProjectId,
           (project, at) =>
@@ -462,7 +431,8 @@ export function App(): React.ReactElement {
                 ...values,
                 // A project reopened from done loses its closing stamp;
                 // one closed here gains it and stops waiting on anybody.
-                closedAt: values.status === 'done' ? (project.closedAt ?? at) : null,
+                closedAt:
+                  values.status === 'done' ? project.closedAt ?? at : null,
                 waitingOn: values.status === 'done' ? [] : project.waitingOn,
                 status:
                   // Editing must not silently clear an active wait: keep
@@ -475,17 +445,21 @@ export function App(): React.ReactElement {
             ),
           { kind: 'project.updated', summary: `Updated “${values.name}”` },
         )
-        if (existing && existing.name !== values.name) setSelectedId(editingProjectId)
+        if (existing && existing.name !== values.name)
+          setSelectedId(editingProjectId)
       } else {
         const project = createProject(values, nowIso)
-        await mutate(current => ({ ...current, projects: [...current.projects, project] }))
+        await mutate(current => ({
+          ...current,
+          projects: [...current.projects, project],
+        }))
         void recordOperation({
           lane: 'user',
           kind: 'project.created',
           summary: `Created “${project.name}”`,
           appSlug: PROJECTS_APP_SLUG,
           refs: { projectId: project.id },
-        })
+        }).catch(() => {})
         setSelectedId(project.id)
       }
       setFormOpen(false)
@@ -507,8 +481,10 @@ export function App(): React.ReactElement {
         summary: `Deleted “${doomed?.name ?? projectId}”`,
         appSlug: PROJECTS_APP_SLUG,
         refs: { projectId },
-      })
+      }).catch(() => {})
       setSelectedId(null)
+      setFormOpen(false)
+      setEditingProjectId(null)
     },
     [store.projects, mutate],
   )
@@ -534,6 +510,10 @@ export function App(): React.ReactElement {
         const closed = match
           ? updateDeliverable(project, match.id, { done: true }, at)
           : project
+        if (project.nextAction !== done)
+          throw new Error(
+            'The next action changed. Review it before completing it.',
+          )
         return touch({ ...closed, nextAction: '' }, at)
       },
       {
@@ -551,7 +531,12 @@ export function App(): React.ReactElement {
         ...current,
         projects: current.projects.map(project =>
           project.id === selected.id
-            ? updateDeliverable(project, deliverable.id, { done }, new Date().toISOString())
+            ? updateDeliverable(
+                project,
+                deliverable.id,
+                { done },
+                new Date().toISOString(),
+              )
             : project,
         ),
       }))
@@ -560,29 +545,32 @@ export function App(): React.ReactElement {
       void recordOperation({
         lane: 'user',
         kind: done ? 'deliverable.completed' : 'deliverable.reopened',
-        summary: `${done ? 'Completed' : 'Reopened'} “${deliverable.title}” on ${selected.name}`,
+        summary: `${done ? 'Completed' : 'Reopened'} “${
+          deliverable.title
+        }” on ${selected.name}`,
         appSlug: PROJECTS_APP_SLUG,
         refs: { projectId: selected.id, deliverableId: deliverable.id },
-      })
+      }).catch(() => {})
     },
     [selected, mutate],
   )
 
   /**
-   * The bridge slice document creation and editing run on. In a dev
-   * harness the fs bridge never answers, so each operation falls back to
-   * an in-memory tree — enough to exercise creating and editing without a
-   * shell, and unreachable inside PureDesktop.
-   */
-  /**
    * Document IO goes through the shell's documents service. There is no
    * dev fallback here on purpose: a document that cannot be written must
    * fail loudly, not appear to save into memory that a restart discards.
    */
-  // The same extension list DocumentEditorOverlay mounts, so a block an agent
-  // writes is a block the reader can show. Built once: buildExtensions creates
-  // new instances each call, and the schema must not change under an edit.
-  const agentDocumentExtensions = useMemo(() => buildExtensions(), [])
+  // Build the shared document schema only when an assistant edits a document.
+  const agentDocumentExtensions = useMemo(() => {
+    let extensions: Promise<Extensions> | undefined
+    return () =>
+      (extensions ??= import('@purescience/platform-editor')
+        .then(module => module.buildExtensions())
+        .catch(error => {
+          extensions = undefined
+          throw error
+        }))
+  }, [])
 
   const documentIo = useMemo(
     () => ({
@@ -600,34 +588,58 @@ export function App(): React.ReactElement {
       title: string
       html?: string
     }): Promise<{ path: string; name: string }> => {
-      const created = await createDocumentPackage(documentIo, { title: input.title })
-      if (input.html?.trim()) {
-        await writeDocumentHtml(documentIo, created.path, input.html)
-      }
-      const project = storeRef.current.projects.find(item => item.id === input.projectId)
-      await editProject(
-        input.projectId,
-        (current, at) =>
-          linkDocument(current, { label: created.name, path: created.path }, at),
-        {
-          kind: 'document.created',
-          summary: `Created “${created.name}”${project ? ` for ${project.name}` : ''}`,
-        },
+      if (!findProject(await refresh(), input.projectId))
+        throw new Error('This project no longer exists.')
+      const created = await createDocumentPackage(documentIo, {
+        title: input.title,
+        html: input.html,
+      })
+      const project = storeRef.current.projects.find(
+        item => item.id === input.projectId,
       )
+      try {
+        await editProject(
+          input.projectId,
+          (current, at) =>
+            linkDocument(
+              current,
+              { label: created.name, path: created.path },
+              at,
+            ),
+          {
+            kind: 'document.created',
+            summary: `Created “${created.name}”${
+              project ? ` for ${project.name}` : ''
+            }`,
+          },
+        )
+      } catch (error) {
+        throw new Error(
+          `The document exists at ${created.path}, but could not be linked — ${
+            error instanceof Error ? error.message : String(error)
+          }. Attach it from Documents after resolving the storage error.`,
+        )
+      }
       return { path: created.path, name: created.name }
     },
-    [documentIo, editProject],
+    [documentIo, editProject, refresh],
   )
 
   const createAndLinkDocument = useCallback(
     async (title: string) => {
       if (!selected) return
+      let createdPath: string | undefined
       try {
         const created = await createDocumentPackage(documentIo, { title })
+        createdPath = created.path
         await editProject(
           selected.id,
           (project, at) =>
-            linkDocument(project, { label: created.name, path: created.path }, at),
+            linkDocument(
+              project,
+              { label: created.name, path: created.path },
+              at,
+            ),
           {
             kind: 'document.created',
             summary: `Created “${created.name}” for ${selected.name}`,
@@ -635,14 +647,18 @@ export function App(): React.ReactElement {
         )
         setEditingDoc({ path: created.path, label: created.name })
       } catch (createError) {
-        setWriteError(
-          createError instanceof Error
-            ? `The document was not created — ${createError.message}`
-            : 'The document was not created.',
-        )
+        const message = createdPath
+          ? `The document was created at ${createdPath}, but could not be linked. Attach it from Documents after resolving the storage error.`
+          : `The document was not created — ${
+              createError instanceof Error
+                ? createError.message
+                : String(createError)
+            }`
+        setWriteError(message)
+        throw new Error(message)
       }
     },
-    [selected, documentIo, editProject],
+    [selected, documentIo, editProject, setWriteError],
   )
 
   useProjectsAgentTools(usable, {
@@ -656,7 +672,7 @@ export function App(): React.ReactElement {
     readDocument: (path: string) => readDocumentHtml(documentIo, path),
     writeDocument: (path: string, html: string) =>
       writeDocumentHtml(documentIo, path, html),
-    documentExtensions: () => agentDocumentExtensions,
+    documentExtensions: agentDocumentExtensions,
     // Agents export through the same code the buttons use, found by id
     // because an agent may act on a project that is not the one on screen.
     exportDocumentsPdf: async (projectId, paths) => {
@@ -714,7 +730,10 @@ export function App(): React.ReactElement {
     async (sourceId: string, targetId: string, place: 'before' | 'after') => {
       const at = new Date().toISOString()
       await mutate(current => {
-        const ordered = sortForDisplay(livingProjects(current.projects), new Date())
+        const ordered = sortForDisplay(
+          livingProjects(current.projects),
+          new Date(),
+        )
         const sequence = sequenceAfterMove(ordered, sourceId, targetId, place)
         return {
           ...current,
@@ -764,7 +783,10 @@ export function App(): React.ReactElement {
             name: `${item.name}.pdf`,
             kind: 'file' as const,
             files: [
-              { name: `${item.name}.pdf`, base64: (await readBinaryFile(scratch)).base64 },
+              {
+                name: `${item.name}.pdf`,
+                base64: (await readBinaryFile(scratch)).base64,
+              },
             ],
           })
         } finally {
@@ -881,8 +903,14 @@ export function App(): React.ReactElement {
         )
         return
       }
+      let renamedPath: string | undefined
       try {
-        const renamed = await renameDocumentPackage(documentIo, link.path, title)
+        const renamed = await renameDocumentPackage(
+          documentIo,
+          link.path,
+          title,
+        )
+        renamedPath = renamed.path
         const nowIso = new Date().toISOString()
         await mutate(current => ({
           ...current,
@@ -904,21 +932,34 @@ export function App(): React.ReactElement {
           summary: `Renamed a document to “${renamed.name}”`,
           appSlug: PROJECTS_APP_SLUG,
           refs: { projectId: selected.id, path: renamed.path },
-        })
+        }).catch(() => {})
       } catch (renameError) {
         setWriteError(
-          renameError instanceof Error
-            ? `The document was not renamed — ${renameError.message}`
-            : 'The document was not renamed.',
+          renamedPath
+            ? `The document moved to ${renamedPath}, but its project links could not be updated. Attach it from Documents to restore the link.`
+            : `The document was not renamed — ${
+                renameError instanceof Error
+                  ? renameError.message
+                  : String(renameError)
+              }`,
         )
       }
     },
     [selected, documentIo, editProject, mutate],
   )
 
-  const onOpenLink = useCallback((path: string) => {
-    void catalogOpen({ path }).catch(() => undefined)
-  }, [])
+  const onOpenLink = useCallback(
+    (path: string) => {
+      void catalogOpen({ path }).catch(error =>
+        setWriteError(
+          `The link could not be opened — ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      )
+    },
+    [setWriteError],
+  )
 
   if (bridgeError && !standalone) {
     return (
@@ -927,7 +968,11 @@ export function App(): React.ReactElement {
           robot="offline"
           tone="error"
           title="PureProjects could not reach the desktop"
-          message={bridgeError instanceof Error ? bridgeError.message : String(bridgeError)}
+          message={
+            bridgeError instanceof Error
+              ? bridgeError.message
+              : String(bridgeError)
+          }
         />
       </AppFrame>
     )
@@ -936,13 +981,20 @@ export function App(): React.ReactElement {
   if (!usable || !loaded) {
     return (
       <AppFrame identityAppSlug={PROJECTS_APP_SLUG}>
-        <EmptyState tone="neutral" title="Opening your projects" message="One moment." />
+        <EmptyState
+          tone="neutral"
+          title="Opening your projects"
+          message="One moment."
+        />
       </AppFrame>
     )
   }
 
   return (
-    <AppFrame identityAppSlug={PROJECTS_APP_SLUG} headerDocumentName={selected?.name}>
+    <AppFrame
+      identityAppSlug={PROJECTS_APP_SLUG}
+      headerDocumentName={selected?.name}
+    >
       {themeless ? <DevThemeFallback /> : null}
       <Shell data-app="projects">
         {selected ? (
@@ -961,129 +1013,189 @@ export function App(): React.ReactElement {
               setEditingProjectId(selected.id)
               setFormOpen(true)
             }}
-            onSetArchived={archived => void setArchived(selected, archived)}
+            onSetArchived={archived =>
+              runUserAction(setArchived(selected, archived))
+            }
             onSetNextAction={text =>
-              void editProject(
-                selected.id,
-                (project, at) => touch({ ...project, nextAction: text }, at),
-                {
-                  kind: 'project.next_action_set',
-                  summary: `Next on ${selected.name}: ${text}`,
-                },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) => touch({ ...project, nextAction: text }, at),
+                  {
+                    kind: 'project.next_action_set',
+                    summary: `Next on ${selected.name}: ${text}`,
+                  },
+                ),
               )
             }
-            onCompleteNextAction={() => void completeNextAction()}
-            onToggleDeliverable={onToggleDeliverable}
+            onCompleteNextAction={() => runUserAction(completeNextAction())}
+            onToggleDeliverable={deliverable =>
+              runUserAction(onToggleDeliverable(deliverable))
+            }
             onAddDeliverable={input =>
-              void editProject(
-                selected.id,
-                (project, at) => addDeliverable(project, input, at),
-                { kind: 'deliverable.added', summary: `Added “${input.title}” to ${selected.name}` },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) => addDeliverable(project, input, at),
+                  {
+                    kind: 'deliverable.added',
+                    summary: `Added “${input.title}” to ${selected.name}`,
+                  },
+                ),
               )
             }
             onUpdateDeliverable={(deliverableId, patch) =>
-              void editProject(selected.id, (project, at) =>
-                updateDeliverable(project, deliverableId, patch, at),
+              runUserAction(
+                editProject(selected.id, (project, at) =>
+                  updateDeliverable(project, deliverableId, patch, at),
+                ),
               )
             }
             onMakeNext={deliverable =>
-              editProject(
-                selected.id,
-                (project, at) =>
-                  setNextActionFromDeliverable(project, deliverable.id, at),
-                {
-                  kind: 'project.next_action_set',
-                  summary: `Next on ${selected.name}: “${deliverable.title}”`,
-                },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) =>
+                    setNextActionFromDeliverable(project, deliverable.id, at),
+                  {
+                    kind: 'project.next_action_set',
+                    summary: `Next on ${selected.name}: “${deliverable.title}”`,
+                  },
+                ),
               )
             }
             moveTargets={store.projects
-              .filter(project => project.id !== selected.id && !isArchived(project))
+              .filter(
+                project => project.id !== selected.id && !isArchived(project),
+              )
               .map(project => ({ id: project.id, name: project.name }))}
             onMoveDeliverable={(deliverableId, toProjectId) => {
-              const target = store.projects.find(project => project.id === toProjectId)
-              const title = selected.deliverables.find(item => item.id === deliverableId)?.title ?? 'a deliverable'
-              void mutate(current =>
-                moveDeliverable(current, { fromProjectId: selected.id, deliverableId, toProjectId }, new Date().toISOString()),
-              ).then(() =>
-                recordOperation({
-                  lane: 'user',
-                  kind: 'deliverable.moved',
-                  summary: `Moved “${title}” from ${selected.name} to ${target?.name ?? 'another project'}`,
-                  appSlug: PROJECTS_APP_SLUG,
-                  refs: { projectId: selected.id },
-                }),
+              const target = store.projects.find(
+                project => project.id === toProjectId,
+              )
+              const title =
+                selected.deliverables.find(item => item.id === deliverableId)
+                  ?.title ?? 'a deliverable'
+              runUserAction(
+                mutate(current =>
+                  moveDeliverable(
+                    current,
+                    { fromProjectId: selected.id, deliverableId, toProjectId },
+                    new Date().toISOString(),
+                  ),
+                ).then(() =>
+                  recordOperation({
+                    lane: 'user',
+                    kind: 'deliverable.moved',
+                    summary: `Moved “${title}” from ${selected.name} to ${
+                      target?.name ?? 'another project'
+                    }`,
+                    appSlug: PROJECTS_APP_SLUG,
+                    refs: { projectId: selected.id },
+                  }),
+                ),
               )
             }}
             onRemoveDeliverable={deliverableId =>
-              void editProject(
-                selected.id,
-                (project, at) => removeDeliverable(project, deliverableId, at),
-                { kind: 'deliverable.removed', summary: `Removed a deliverable from ${selected.name}` },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) =>
+                    removeDeliverable(project, deliverableId, at),
+                  {
+                    kind: 'deliverable.removed',
+                    summary: `Removed a deliverable from ${selected.name}`,
+                  },
+                ),
               )
             }
             onAddWaitingOn={waiting =>
-              void editProject(
-                selected.id,
-                (project, at) =>
-                  addWaitingOnProject(
-                    project,
-                    { ...waiting, askedAt: new Date().toISOString().slice(0, 10) },
-                    at,
-                  ),
-                {
-                  kind: 'project.waiting',
-                  summary: `Waiting on ${waiting.person} for ${selected.name}`,
-                },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) =>
+                    addWaitingOnProject(
+                      project,
+                      {
+                        ...waiting,
+                        askedAt: new Date().toISOString().slice(0, 10),
+                      },
+                      at,
+                    ),
+                  {
+                    kind: 'project.waiting',
+                    summary: `Waiting on ${waiting.person} for ${selected.name}`,
+                  },
+                ),
               )
             }
             onResolveWaitingOn={waitingId =>
-              void editProject(
-                selected.id,
-                (project, at) => resolveWaitingOnProject(project, waitingId, at),
-                {
-                  kind: 'project.unblocked',
-                  summary: waitingId
-                    ? `A wait cleared on ${selected.name}`
-                    : `${selected.name} is no longer waiting on anyone`,
-                },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) =>
+                    resolveWaitingOnProject(project, waitingId, at),
+                  {
+                    kind: 'project.unblocked',
+                    summary: waitingId
+                      ? `A wait cleared on ${selected.name}`
+                      : `${selected.name} is no longer waiting on anyone`,
+                  },
+                ),
               )
             }
             activity={selectedActivity}
             onAddJournalEntry={entry =>
-              void editProject(
-                selected.id,
-                (project, at) => logJournalEntry(project, entry, at),
-                { kind: 'journal.logged', summary: `Logged “${entry.title}” on ${selected.name}` },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) => logJournalEntry(project, entry, at),
+                  {
+                    kind: 'journal.logged',
+                    summary: `Logged “${entry.title}” on ${selected.name}`,
+                  },
+                ),
               )
             }
             onEditJournalEntry={(entryId, patch) =>
-              void editProject(selected.id, (project, at) =>
-                editJournalEntry(project, entryId, patch, at),
+              runUserAction(
+                editProject(selected.id, (project, at) =>
+                  editJournalEntry(project, entryId, patch, at),
+                ),
               )
             }
             onRemoveJournalEntry={entryId =>
-              void editProject(selected.id, (project, at) =>
-                removeJournalEntry(project, entryId, at),
+              runUserAction(
+                editProject(selected.id, (project, at) =>
+                  removeJournalEntry(project, entryId, at),
+                ),
               )
             }
             onBrowseForDocument={() => setPickerOpen(true)}
             onLinkUrl={link =>
-              void editProject(
-                selected.id,
-                (project, at) =>
-                  linkDocument(project, { ...link, kind: 'web' }, at),
-                {
-                  kind: 'project.link_added',
-                  summary: `Linked ${link.label} to ${selected.name}`,
-                },
+              runUserAction(
+                editProject(
+                  selected.id,
+                  (project, at) =>
+                    linkDocument(project, { ...link, kind: 'web' }, at),
+                  {
+                    kind: 'project.link_added',
+                    summary: `Linked ${link.label} to ${selected.name}`,
+                  },
+                ),
               )
             }
             onCreateDocument={() => setNamingDocument(true)}
-            onRenameLink={(link, title) => void renameLink(link, title)}
+            onRenameLink={(link, title) =>
+              runUserAction(renameLink(link, title))
+            }
             onOpenDocument={link => setEditingDoc(link)}
             onRemoveLink={linkId =>
-              void editProject(selected.id, (project, at) => removeLink(project, linkId, at))
+              runUserAction(
+                editProject(selected.id, (project, at) =>
+                  removeLink(project, linkId, at),
+                ),
+              )
             }
             onOpenLink={onOpenLink}
             onBack={() => setSelectedId(null)}
@@ -1176,7 +1288,9 @@ export function App(): React.ReactElement {
                     onReorder={
                       canReorder
                         ? (sourceId, targetId, place) =>
-                            void reorderProjects(sourceId, targetId, place)
+                            runUserAction(
+                              reorderProjects(sourceId, targetId, place),
+                            )
                         : undefined
                     }
                   />
@@ -1190,7 +1304,12 @@ export function App(): React.ReactElement {
                     </span>
                     <Spacer />
                     {writeError ? (
-                      <span style={{ color: 'var(--platform-colors-semantic-red-text, #8a2d24)' }}>
+                      <span
+                        style={{
+                          color:
+                            'var(--platform-colors-semantic-red-text, #8a2d24)',
+                        }}
+                      >
                         {writeError}
                       </span>
                     ) : summary.noNextAction > 0 ? (
@@ -1207,42 +1326,55 @@ export function App(): React.ReactElement {
       </Shell>
       <ProjectForm
         open={formOpen}
-        project={editingProjectId ? (selected ?? null) : null}
+        project={editingProjectId ? selected ?? null : null}
         areaSuggestions={areas}
         onClose={() => {
           setFormOpen(false)
           setEditingProjectId(null)
         }}
-        onSubmit={values => void submitProjectForm(values)}
+        onSubmit={submitProjectForm}
         onDelete={
-          editingProjectId ? () => void deleteProject(editingProjectId) : undefined
+          editingProjectId ? () => deleteProject(editingProjectId) : undefined
         }
       />
       <NameDocumentDialog
         open={namingDocument}
         projectName={selected?.name ?? 'this project'}
         onClose={() => setNamingDocument(false)}
-        onCreate={title => void createAndLinkDocument(title)}
+        onCreate={createAndLinkDocument}
       />
-      <DocumentEditorOverlay
-        open={!!editingDoc}
-        packagePath={editingDoc?.path ?? null}
-        label={editingDoc?.label ?? 'Document'}
-        onClose={() => setEditingDoc(null)}
-        onRead={packagePath => readDocumentHtml(documentIo, packagePath)}
-        onWrite={(packagePath, html) => writeDocumentHtml(documentIo, packagePath, html)}
-        onOpenInWriter={packagePath => onOpenLink(packagePath)}
-      />
+      {editingDoc ? (
+        <Suspense
+          fallback={<span role="status">Opening document editor…</span>}
+        >
+          <DocumentEditorOverlay
+            open={!!editingDoc}
+            packagePath={editingDoc?.path ?? null}
+            label={editingDoc?.label ?? 'Document'}
+            onClose={() => setEditingDoc(null)}
+            onRead={packagePath => readDocumentHtml(documentIo, packagePath)}
+            onWrite={(packagePath, html) =>
+              writeDocumentHtml(documentIo, packagePath, html)
+            }
+            onOpenInWriter={path => catalogOpen({ path })}
+          />
+        </Suspense>
+      ) : null}
       <DocumentPicker
         open={pickerOpen}
         bridgeLive={bridgeLive}
         onClose={() => setPickerOpen(false)}
         onChoose={choice => {
           if (!selected) return
-          void editProject(
-            selected.id,
-            (project, at) => linkDocument(project, choice, at),
-            { kind: 'link.added', summary: `Linked ${choice.label} to ${selected.name}` },
+          runUserAction(
+            editProject(
+              selected.id,
+              (project, at) => linkDocument(project, choice, at),
+              {
+                kind: 'link.added',
+                summary: `Linked ${choice.label} to ${selected.name}`,
+              },
+            ),
           )
         }}
       />
