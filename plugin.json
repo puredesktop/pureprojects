@@ -29,7 +29,7 @@
         {
         "name": "getProjectsContext",
         "risk": "read",
-          "description": "Overview of the user's projects: totals by status, what is overdue, what is waiting on someone, and which projects have no next action. Call this first to see where the work stands before answering anything about projects.",
+          "description": "Overview of projects, including openProject (the project currently on screen), totals by status, overdue work, waits and missing next actions. Call first. Unqualified add/todo requests target openProject; act without asking for optional owner or date details.",
           "inputSchema": {
             "type": "object",
             "properties": {}
@@ -176,12 +176,13 @@
         },
         {
           "name": "addDeliverable",
-          "description": "Add a deliverable to a project: a concrete thing that gets finished, with an owner and a due date.",
+          "description": "Add a todo/deliverable. An unqualified request such as add X targets the currently open project: omit projectId to use it. Act without asking for optional details; omit owner for the user and dueAt when no date was given.",
           "inputSchema": {
             "type": "object",
             "properties": {
               "projectId": {
-                "type": "string"
+                "type": "string",
+                "description": "Explicit target project id. Omit to use the currently open project."
               },
               "title": {
                 "type": "string",
@@ -193,11 +194,10 @@
               },
               "dueAt": {
                 "type": "string",
-                "description": "ISO date."
+                "description": "ISO date. Omit when no deadline was given."
               }
             },
             "required": [
-              "projectId",
               "title"
             ]
           },

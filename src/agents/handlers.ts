@@ -99,7 +99,7 @@ export async function getProjectsContextHandler(
   return {
     content: formatAgentToolJson({
       // What the user is looking at. "This project", "the project", "it" and
-      // an unqualified "make a document" all mean this one.
+      // unqualified "add a todo" or "make a document" all mean this one.
       openProject: open ? { id: open.id, name: open.name } : null,
       summary,
       needsAttention: attention.map(project => projectLine(project, now)),
@@ -110,7 +110,10 @@ export async function getProjectsContextHandler(
         'leaving a project active; a project can be waiting on several at ' +
         'once, and clearing one names which arrived (resolveWaitingId). The ' +
         'status follows the list: it returns to active when the last wait ' +
-        'clears. A project with no next action is a defect worth raising.',
+        'clears. A project with no next action is a defect worth raising. ' +
+        'Unqualified add/todo requests target openProject. Add them as ' +
+        'deliverables now; omit owner for the user and dueAt when no date ' +
+        'was given. Do not ask for optional details before writing.',
     }),
   }
 }
@@ -308,7 +311,11 @@ export async function addDeliverableHandler(
   if (!title) return agentToolErrorContent('title is required')
   const owner = readAgentToolStringArg(args, 'owner') ?? ''
   const dueAt = readAgentToolStringArg(args, 'dueAt') ?? ''
-  const result = await withProject(context, args, (project, now) =>
+  const projectId = readAgentToolStringArg(args, 'projectId')?.trim() || context.openProjectId()
+  if (!projectId) {
+    return agentToolErrorContent('No project is open. Name a project or open one before adding a todo.')
+  }
+  const result = await withProject(context, { ...args, projectId }, (project, now) =>
     addDeliverable(project, { title, owner, dueAt }, now),
   )
   if (!result.ok) return agentToolErrorContent(result.error)
@@ -316,6 +323,8 @@ export async function addDeliverableHandler(
   return {
     content: formatAgentToolJson({
       added: true,
+      projectId: result.project.id,
+      projectName: result.project.name,
       deliverableId: added?.id,
       title,
       deliverables: `${completedCount(result.project)}/${result.project.deliverables.length}`,
