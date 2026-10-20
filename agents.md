@@ -147,7 +147,10 @@ full manual controls. Two deliberate asymmetries:
   `replaceDocumentBlock` and `deleteDocumentBlock` change one of them and
   leave the rest untouched. There is deliberately no tool that rewrites a
   whole document: a small change should not put the rest of someone's
-  prose at risk.
+  prose at risk. An edit replies with what it changed (the block count,
+  the index it touched, the blocks it wrote, how later indexes shifted),
+  never the whole document; `readDocument` is how you see the rest, and
+  `fromIndex`/`limit` read a long document a stretch at a time.
 - **Diagrams are a first-class block.** Pass `mermaid` instead of `html`
   to `insertDocumentBlock` or `replaceDocumentBlock` with the diagram
   source alone — `graph TD; A --> B;` — and it is stored as a diagram the

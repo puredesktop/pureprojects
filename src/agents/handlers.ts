@@ -658,21 +658,50 @@ export async function readDocumentHandler(
   const found = await requireLinkedDocument(context, args)
   if (isHandlerResult(found)) return found
   const blocks = readDocumentBlocks(await context.documentExtensions(), found.html)
+  // Optional range: a long document can be read a stretch at a time.
+  const fromIndex =
+    typeof args.fromIndex === 'number' && args.fromIndex > 0 ? Math.floor(args.fromIndex) : 0
+  const limit =
+    typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : undefined
+  const shown =
+    fromIndex > 0 || limit !== undefined
+      ? blocks.slice(fromIndex, limit !== undefined ? fromIndex + limit : undefined)
+      : blocks
   return {
     content: formatAgentToolJson({
       path: found.path,
       blockCount: blocks.length,
-      blocks,
+      ...(shown !== blocks ? { fromIndex, returned: shown.length } : {}),
+      blocks: shown,
       note: 'Edit by block index. Indexes shift after every insert or delete — read again before the next edit.',
     }),
   }
 }
 
-/** Shared tail: write the new html, report the document as it now stands. */
+/**
+ * Where an edit landed: the first block index it touched and how many
+ * blocks it took out (0 for an insert, 1 for a replace or delete).
+ */
+interface DocumentEdit {
+  action: 'inserted' | 'replaced' | 'deleted'
+  start: number
+  removed: number
+}
+
+/** Most blocks a reply shows back from one edit; the rest are counted. */
+const MAX_CHANGED_BLOCKS = 20
+
+/**
+ * Shared tail: write the new html, report what the edit changed — the
+ * block count, the blocks it wrote, and how later indexes shifted. Never
+ * the whole block list: readDocument returns that.
+ */
 async function commitDocument(
   context: ProjectsAgentToolContext,
   path: string,
+  previousHtml: string,
   html: string | null,
+  edit: DocumentEdit,
   failure: string,
 ): Promise<AgentToolHandlerResult> {
   if (html === null) return agentToolErrorContent(failure)
@@ -683,12 +712,24 @@ async function commitDocument(
       `could not write ${path}: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
-  const blocks = readDocumentBlocks(await context.documentExtensions(), html)
+  const extensions = await context.documentExtensions()
+  const before = readDocumentBlocks(extensions, previousHtml).length
+  const blocks = readDocumentBlocks(extensions, html)
+  const shift = blocks.length - before
+  const added = Math.max(0, shift + edit.removed)
+  const changed = blocks.slice(edit.start, edit.start + Math.min(added, MAX_CHANGED_BLOCKS))
   return {
     content: formatAgentToolJson({
       path,
+      [edit.action]: true,
+      index: edit.start,
       blockCount: blocks.length,
-      blocks,
+      ...(edit.action === 'deleted' ? {} : { changedBlocks: changed }),
+      ...(added > changed.length ? { moreChangedBlocks: added - changed.length } : {}),
+      ...(shift !== 0 && edit.start + added < blocks.length
+        ? { shifted: `blocks from index ${edit.start + added} on moved by ${shift > 0 ? '+' : ''}${shift}` }
+        : {}),
+      note: 'Call readDocument for the full block list before editing by another index.',
     }),
   }
 }
@@ -717,15 +758,23 @@ export async function insertDocumentBlockHandler(
       : at === 'after'
         ? ({ at: 'after', index: index as number } as const)
         : ({ at: 'end' } as const)
+  const start =
+    position.at === 'end'
+      ? readDocumentBlocks(await context.documentExtensions(), found.html).length
+      : position.at === 'after'
+        ? position.index + 1
+        : position.index
   return commitDocument(
     context,
     found.path,
+    found.html,
     insertDocumentBlock(
       await context.documentExtensions(),
       found.html,
       markup,
       position,
     ),
+    { action: 'inserted', start, removed: 0 },
     `no block ${index} in ${found.path} — call readDocument for current indexes`,
   )
 }
@@ -746,12 +795,14 @@ export async function replaceDocumentBlockHandler(
   return commitDocument(
     context,
     found.path,
+    found.html,
     replaceDocumentBlock(
       await context.documentExtensions(),
       found.html,
       index,
       mermaid ? mermaidBlockHtml(mermaid) : (html as string),
     ),
+    { action: 'replaced', start: index, removed: 1 },
     `no block ${index} in ${found.path} — call readDocument for current indexes`,
   )
 }
@@ -767,7 +818,9 @@ export async function deleteDocumentBlockHandler(
   return commitDocument(
     context,
     found.path,
+    found.html,
     deleteDocumentBlock(await context.documentExtensions(), found.html, index),
+    { action: 'deleted', start: index, removed: 1 },
     `no block ${index} in ${found.path} — call readDocument for current indexes`,
   )
 }
