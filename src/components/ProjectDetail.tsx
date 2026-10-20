@@ -22,6 +22,7 @@ import {
   linkAgentRefs,
   projectAgentRefs,
   waitingAgentRefs,
+  withOpenSurface,
 } from '../lib/agentRefs'
 
 const Pane = styled.div`
@@ -773,7 +774,7 @@ export function ProjectDetail({
   }
 
   return (
-    <Pane {...projectAgentRefs(project)}>
+    <Pane {...withOpenSurface(projectAgentRefs(project))}>
       {/* The band carries identity. What the work is DOING moved below it. */}
       <Band>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

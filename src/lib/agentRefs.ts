@@ -53,3 +53,13 @@ export function linkAgentRefs(link: Pick<ProjectLink, 'id' | 'path' | 'label'>):
 export function documentAgentRefs(packagePath: string, label: string): AgentRefProps {
   return tag(packagePath, ['path', 'paths'], label)
 }
+
+/**
+ * The open surface: a write call that names no tagged item is drawn on the element carrying `@open` (the open
+ * project's page, or the project list when none is open). Exactly one renders at a time.
+ */
+export const OPEN_SURFACE_REF = '@open'
+
+export function withOpenSurface(props: AgentRefProps): AgentRefProps {
+  return { ...props, 'data-agent-ref': [props['data-agent-ref'], OPEN_SURFACE_REF].filter(Boolean).join(' ') }
+}

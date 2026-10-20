@@ -94,6 +94,7 @@ import { DocumentPicker } from './components/DocumentPicker'
 import { NameDocumentDialog } from './components/NameDocumentDialog'
 import { MenuSelect } from './components/MenuSelect'
 import { ProjectsList } from './components/ProjectsList'
+import { OPEN_SURFACE_REF } from './lib/agentRefs'
 import {
   Attention,
   AttentionDot,
@@ -1264,7 +1265,7 @@ export function App(): React.ReactElement {
             </Toolbar>
 
             <Body>
-              <Main>
+              <Main data-agent-ref={OPEN_SURFACE_REF} data-agent-label="Projects">
                 {loadError ? (
                   <EmptyState
                     robot="error"
