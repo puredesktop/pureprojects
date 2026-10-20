@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Modal } from '@purescience/platform-ui/components/common/overlays/Modal'
+import { documentAgentRefs } from '../lib/agentRefs'
 import {
   DocumentEditor,
   useEditorExtensions,
@@ -257,7 +258,7 @@ function DocumentSession({
         </div>
       }
     >
-      <Frame>
+      <Frame {...documentAgentRefs(packagePath, label)}>
         {html === null ? (
           <Loading>
             {error ? (
