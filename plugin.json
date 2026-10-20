@@ -321,13 +321,21 @@
         {
         "name": "readDocument",
         "risk": "read",
-          "description": "Read a linked .document package as a numbered list of blocks. Call this before editing one: block indexes are how the edit tools address content, and they shift after every insert or delete.",
+          "description": "Read a linked .document package as a numbered list of blocks. Call this before editing one: block indexes are how the edit tools address content, and they shift after every insert or delete. For a long document pass fromIndex and limit to read a stretch; blockCount is always the whole document's.",
           "inputSchema": {
             "type": "object",
             "properties": {
               "path": {
                 "type": "string",
                 "description": "The document's path, as listed on the project by getProject."
+              },
+              "fromIndex": {
+                "type": "number",
+                "description": "Optional. First block to return. Defaults to 0."
+              },
+              "limit": {
+                "type": "number",
+                "description": "Optional. Most blocks to return. Omit for every block from fromIndex on."
               }
             },
             "required": [
@@ -337,7 +345,7 @@
         },
         {
           "name": "insertDocumentBlock",
-          "description": "Add a block to a linked document. Pass html for prose, or mermaid for a diagram - give the diagram source only (for example 'graph TD; A --> B;') and it is wrapped as a diagram the editor renders. Defaults to the end of the document.",
+          "description": "Add a block to a linked document. Pass html for prose, or mermaid for a diagram - give the diagram source only (for example 'graph TD; A --> B;') and it is wrapped as a diagram the editor renders. Defaults to the end of the document. Replies with what changed: the block count, the index it touched, the blocks it wrote and how later indexes shifted, not the whole document; call readDocument for the full block list.",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -373,7 +381,7 @@
         },
         {
           "name": "replaceDocumentBlock",
-          "description": "Replace one block of a linked document, leaving the rest untouched. Pass html, or mermaid to make the block a diagram.",
+          "description": "Replace one block of a linked document, leaving the rest untouched. Pass html, or mermaid to make the block a diagram. Replies with what changed: the block count, the index it touched, the blocks it wrote and how later indexes shifted, not the whole document; call readDocument for the full block list.",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -400,7 +408,7 @@
         {
         "name": "deleteDocumentBlock",
         "risk": "destructive",
-          "description": "Delete one block of a linked document. Removing a block discards its content - to reword something use replaceDocumentBlock instead.",
+          "description": "Delete one block of a linked document. Removing a block discards its content - to reword something use replaceDocumentBlock instead. Replies with the new block count and how later indexes shifted, not the whole document.",
           "inputSchema": {
             "type": "object",
             "properties": {
