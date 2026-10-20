@@ -20,6 +20,7 @@ import {
   waitingLines,
 } from '../lib/projectModel'
 import type { Project } from '../types'
+import { projectAgentRefs } from '../lib/agentRefs'
 
 /** "in 4 days" / "2 days ago" — the reading people scan by. */
 export function relativeDue(dueAt: string, now: Date): string {
@@ -103,6 +104,7 @@ export function ProjectsList({
           return (
             <Row
               key={project.id}
+              {...projectAgentRefs(project)}
               $selected={project.id === selectedId}
               $dragging={dragging === project.id}
               $dropBefore={dropAt?.id === project.id && dropAt.place === 'before'}

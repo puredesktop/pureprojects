@@ -17,6 +17,12 @@ import { Bar, BarFill, Button, Kicker, Mono, StatusChip, chrome } from './shellS
 import { isDocumentPackage } from '../lib/projectDocument'
 import { exportableDocuments } from '../lib/documentExport'
 import type { Deliverable, Project, ProjectLink } from '../types'
+import {
+  deliverableAgentRefs,
+  linkAgentRefs,
+  projectAgentRefs,
+  waitingAgentRefs,
+} from '../lib/agentRefs'
 
 const Pane = styled.div`
   container-type: inline-size;
@@ -767,7 +773,7 @@ export function ProjectDetail({
   }
 
   return (
-    <Pane>
+    <Pane {...projectAgentRefs(project)}>
       {/* The band carries identity. What the work is DOING moved below it. */}
       <Band>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -949,7 +955,7 @@ export function ProjectDetail({
                       </div>
                     </form>
                   ) : (
-                    <HoverRow key={deliverable.id}>
+                    <HoverRow key={deliverable.id} {...deliverableAgentRefs(deliverable)}>
                       <DeliverableRow $current={deliverable.id === firstOpen?.id}>
                         <Check
                           $done={!!deliverable.doneAt}
@@ -1272,7 +1278,7 @@ export function ProjectDetail({
               ) : null}
             </SectionHead>
             {project.waitingOn.map(wait => (
-              <WaitingCard key={wait.id}>
+              <WaitingCard key={wait.id} {...waitingAgentRefs(wait)}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>
                     {wait.person}
@@ -1482,7 +1488,7 @@ export function ProjectDetail({
                   </IconButton>
                 </form>
               ) : (
-                <HoverRow key={link.id}>
+                <HoverRow key={link.id} {...linkAgentRefs(link)}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {exportablePaths.has(link.path) ? (
                       <DocPick
