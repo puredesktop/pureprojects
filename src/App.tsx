@@ -38,6 +38,7 @@ import {
   writeAppStorageJson,
 } from './bridge/platformBridge'
 import type { PlatformOperation } from './bridge/platformBridge'
+import { compactPart, useCompactInRoom } from './hooks/useCompactInRoom'
 import { useProjectPersistence } from './hooks/useProjectPersistence'
 import { mergeOperations, projectActivity } from './lib/projectActivity'
 import { PROJECTS_APP_SLUG } from './constants'
@@ -93,6 +94,7 @@ import { DevThemeFallback } from './components/DevThemeFallback'
 import { DocumentPicker } from './components/DocumentPicker'
 import { NameDocumentDialog } from './components/NameDocumentDialog'
 import { MenuSelect } from './components/MenuSelect'
+import { MiniProjects } from './components/MiniProjects'
 import { ProjectsList } from './components/ProjectsList'
 import { OPEN_SURFACE_REF } from './lib/agentRefs'
 import {
@@ -128,6 +130,12 @@ type RailFilter =
   | 'archived'
 
 export function App(): React.ReactElement {
+  const compact = useCompactInRoom()
+  // lying flat in the page that holds it, on either kind of page: only while compact
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-held-in-room', compact)
+    return () => document.documentElement.removeAttribute('data-held-in-room')
+  }, [compact])
   const { ready, error: bridgeError } = usePlatformBridge()
   const standalone = isStandaloneDevMode()
   const usable = ready || standalone
@@ -995,9 +1003,40 @@ export function App(): React.ReactElement {
     <AppFrame
       identityAppSlug={PROJECTS_APP_SLUG}
       headerDocumentName={selected?.name}
+      {...(compact ? { 'data-compact-room': '' } : undefined)}
     >
       {themeless ? <DevThemeFallback /> : null}
-      <Shell data-app="projects">
+      {compact ? (
+        <MiniProjects
+          projects={living}
+          selected={selected ?? null}
+          now={now}
+          notice={writeError}
+          onSelect={setSelectedId}
+          onNewProject={() => {
+            setEditingProjectId(null)
+            setFormOpen(true)
+          }}
+          onSetNextAction={text => {
+            if (selected) runUserAction(editProject(selected.id, (project, at) => touch({ ...project, nextAction: text }, at), { kind: 'project.next_action_set', summary: `Next on ${selected.name}: ${text}` }))
+          }}
+          onCompleteNextAction={() => runUserAction(completeNextAction())}
+          onToggleDeliverable={deliverable => runUserAction(onToggleDeliverable(deliverable))}
+          onAddDeliverable={input => {
+            if (selected) runUserAction(editProject(selected.id, (project, at) => addDeliverable(project, input, at), { kind: 'deliverable.added', summary: `Added “${input.title}” to ${selected.name}` }))
+          }}
+          onAddWaitingOn={waiting => {
+            if (selected) runUserAction(editProject(selected.id, (project, at) => addWaitingOnProject(project, { ...waiting, askedAt: new Date().toISOString().slice(0, 10) }, at), { kind: 'project.waiting', summary: `Waiting on ${waiting.person} for ${selected.name}` }))
+          }}
+          onResolveWaitingOn={waitingId => {
+            if (selected) runUserAction(editProject(selected.id, (project, at) => resolveWaitingOnProject(project, waitingId, at), { kind: 'project.unblocked', summary: `A wait cleared on ${selected.name}` }))
+          }}
+          onAddJournalEntry={entry => {
+            if (selected) runUserAction(editProject(selected.id, (project, at) => logJournalEntry(project, entry, at), { kind: 'journal.logged', summary: `Logged “${entry.title}” on ${selected.name}` }))
+          }}
+        />
+      ) : null}
+      <Shell data-app="projects" {...compactPart(compact, 'hide')}>
         {selected ? (
           <ProjectDetail
             project={selected}
