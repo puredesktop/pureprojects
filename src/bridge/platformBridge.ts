@@ -50,14 +50,14 @@ export async function writeAppStorageJson(
   fileName: AppStorageJsonFileName,
   value: unknown,
   ifMatch: string | null,
-): Promise<{ ok: boolean; conflict?: boolean }> {
+): Promise<{ ok: boolean; conflict?: boolean; version?: string | null }> {
   const result = await writePlatformStorageJson({
     appSlug: PROJECTS_APP_SLUG,
     fileName,
     value,
     ifMatch,
   })
-  if (result.ok) return { ok: true }
+  if (result.ok) return { ok: true, version: (result as { version?: string | null }).version }
   return { ok: false, conflict: 'conflict' in result && result.conflict === true }
 }
 

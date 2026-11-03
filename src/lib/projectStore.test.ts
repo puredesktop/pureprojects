@@ -82,7 +82,7 @@ describe('project persistence', () => {
     const { storage, io, disk } = fixture()
     vi.mocked(io.writeJson).mockResolvedValue({ ok: false, conflict: true })
     await expect(storage.update(add('Unsaved'))).rejects.toThrow(
-      'changed twice',
+      'kept changing',
     )
     expect(disk().projects).toEqual([])
   })

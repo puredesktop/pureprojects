@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { PROJECTS_STORE_FILE } from '../constants'
 import { addDeliverable, createProject, emptyStore } from './projectModel'
 import { ProjectStore, type ProjectStorageIo } from './projectStore'
 import type { ProjectsStore } from '../types'
@@ -20,7 +19,7 @@ function shared() {
       disk.value = structuredClone(value) as ProjectsStore
       disk.version++
       disk.writes++
-      return { ok: true }
+      return { ok: true, version: String(disk.version) }
     },
   }
   return { disk, a: new ProjectStore(io), b: new ProjectStore(io) }
@@ -58,6 +57,7 @@ describe('two copies of the store', () => {
     expect(await b.loadIfChanged()).toBeNull()
     await a.update(addProject('q'))
     expect((await b.loadIfChanged())?.projects.map(p => p.id)).toEqual(['p', 'q'])
-    expect(PROJECTS_STORE_FILE).toBeTruthy()
+    await b.update(addProject('r'))
+    expect(await b.loadIfChanged()).toBeNull()
   })
 })

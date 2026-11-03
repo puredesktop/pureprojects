@@ -30,6 +30,12 @@ export function useProjectPersistence(
       throw error
     }
   }, [storage, standalone, setStore])
+  /** Takes in what another copy saved. A look that finds nothing new changes nothing on screen. */
+  const pickUp = useCallback(async () => {
+    if (standalone) return
+    const value = await storage.loadIfChanged().catch(() => null)
+    if (value) setStore(value)
+  }, [storage, standalone, setStore])
   const mutate = useCallback(
     async (change: (value: ProjectsStore) => ProjectsStore) => {
       try {
@@ -56,6 +62,7 @@ export function useProjectPersistence(
     storeRef,
     setStore,
     refresh,
+    pickUp,
     mutate,
     writeError,
     setWriteError,

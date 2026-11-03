@@ -120,6 +120,8 @@ const DocumentEditorOverlay = lazy(() =>
 
 /** Long enough for a slow boot, short enough not to look hung. */
 const BOOT_TIMEOUT_MS = 8000
+/** How often a copy looks for what another saved. */
+const LOOK_EVERY_MS = 15_000
 
 type RailFilter =
   | 'all'
@@ -190,6 +192,7 @@ export function App(): React.ReactElement {
     storeRef,
     setStore,
     refresh,
+    pickUp,
     mutate,
     writeError,
     setWriteError,
@@ -256,19 +259,23 @@ export function App(): React.ReactElement {
 
   // The other instance (or the agent working in it) may have changed the
   // store while this window sat in the background. Re-read on focus so the
-  // user is never looking at a project list that quietly went out of date.
+  // user is never looking at a project list that quietly went out of date, and
+  // every so often: a copy held in a page beside a conversation is looked at
+  // without ever being focused.
   useEffect(() => {
     if (!usable || standalone) return
     const onVisible = (): void => {
-      if (document.visibilityState === 'visible') void refresh().catch(() => {})
+      if (document.visibilityState === 'visible') void pickUp()
     }
+    const every = window.setInterval(onVisible, LOOK_EVERY_MS)
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
+      window.clearInterval(every)
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [usable, standalone, refresh])
+  }, [usable, standalone, pickUp])
 
   // Archived projects are out of view everywhere at once: not counted, not
   // listed, not searched. Splitting here rather than filtering at each call
