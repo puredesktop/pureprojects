@@ -1,0 +1,32 @@
+/* PureProjects held in a page (useCompactInRoom). The frame carries data-compact-room only then, and every rule here
+   starts from it, so with compact off nothing in this file applies. The list and the project page are hidden, not removed:
+   everything stays mounted, so state stays and the agent's tools keep working. Full app gives it all back. */
+
+[data-compact-room] > header,
+[data-compact-room] [data-compact='hide'] {
+  display: none;
+}
+
+/* One white sheet in the page's light, whatever the desk's theme: hairlines, square corners, no panels. */
+[data-compact-room] {
+  color-scheme: light;
+  --p-sheet: #ffffff;
+  --p-ink: #161d27;
+  --p-soft: #4f5866;
+  --p-faint: #79818e;
+  --p-line: #dde1e7;
+  --p-rule: #eef0f3;
+  --p-hover: #f4f6f9;
+  --p-accent: oklch(0.45 0.11 200);
+  --p-accent-tint: oklch(0.965 0.015 200);
+  --p-ok: #1d6b4b;
+  --p-ok-tint: #e1f1e8;
+  --p-bad: #b23b27;
+  --p-warn: #8a5a12;
+  background: #ffffff;
+  color: var(--p-ink);
+}
+html[data-held-in-room]:has([data-compact-room]),
+html[data-held-in-room]:has([data-compact-room]) body {
+  background: #ffffff;
+}
