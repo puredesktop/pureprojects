@@ -55,5 +55,5 @@ it('has no style that can apply with compact off: every selector starts from the
   const rules = readFileSync(join(process.cwd(), 'src/compact-in-room.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
   const selectors = [...rules.matchAll(/([^{}]+)\{/g)].flatMap(m => m[1]!.split(',')).map(s => s.trim())
   expect(selectors.length).toBeGreaterThan(3)
-  for (const selector of selectors) expect(selector).toMatch(/^(\[data-compact-room\]|html\[data-held-in-room\]:has\(\[data-compact-room\]\))/)
+  for (const selector of selectors) expect(selector).toMatch(/^(\[data-compact-room\]|html:has\(\[data-compact-room\]\))/)
 })

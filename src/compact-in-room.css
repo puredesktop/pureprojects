@@ -17,8 +17,8 @@
   --p-line: #dde1e7;
   --p-rule: #eef0f3;
   --p-hover: #f4f6f9;
-  --p-accent: oklch(0.45 0.11 200);
-  --p-accent-tint: oklch(0.965 0.015 200);
+  --p-accent: #2f5d8c; /* the held look's one muted accent */
+  --p-accent-tint: #eef2f7;
   --p-ok: #1d6b4b;
   --p-ok-tint: #e1f1e8;
   --p-bad: #b23b27;
@@ -26,7 +26,32 @@
   background: #ffffff;
   color: var(--p-ink);
 }
-html[data-held-in-room]:has([data-compact-room]),
-html[data-held-in-room]:has([data-compact-room]) body {
+html:has([data-compact-room]),
+html:has([data-compact-room]) body {
   background: #ffffff;
+}
+
+/* The held look: 13px sans type, headings at most 15px, hairlines, 28px controls with 3px corners, flat. */
+[data-compact-room][data-compact-room] h1,
+[data-compact-room][data-compact-room] h2,
+[data-compact-room][data-compact-room] h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+[data-compact-room][data-compact-room] p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+[data-compact-room] button,
+[data-compact-room] input,
+[data-compact-room] select {
+  min-height: 28px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 500;
+}
+[data-compact-room] span:not(:empty) {
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
 }
