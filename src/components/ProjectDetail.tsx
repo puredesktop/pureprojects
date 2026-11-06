@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { quiet, statusLabel } from '../ui/styles'
-import { FolderInput, NotebookPen, Pencil, Target, Trash2, Unlink } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 import {
   completedCount,
   daysUntil,
@@ -313,19 +313,14 @@ const ActivityLane = styled.span.attrs(chrome('meta'))`
   flex: none;
 `
 
+/** One entry in a row's menu: an action in words, or a small heading over the actions that follow it. */
+type RowMenuEntry = { label: string; onSelect: () => void } | { heading: string }
+
 /**
- * "Move to…" on a deliverable row: a small list of the other projects,
- * opened in place. Picking one carries the deliverable across, unchanged.
+ * A row's actions: one small button at the row's right edge, always there, that opens its actions in words
+ * (make it the next action, edit, move to another project, remove). Words, not a row of icons, so each is plain.
  */
-function MoveMenu({
-  deliverable,
-  targets,
-  onMove,
-}: {
-  deliverable: Deliverable
-  targets: Array<{ id: string; name: string }>
-  onMove: (toProjectId: string) => void
-}): React.ReactElement {
+function RowMenu({ name, entries }: { name: string; entries: RowMenuEntry[] }): React.ReactElement {
   const [open, setOpen] = useState(false)
   const root = React.useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -333,8 +328,10 @@ function MoveMenu({
     const onDown = (event: PointerEvent): void => {
       if (!root.current?.contains(event.target as Node)) setOpen(false)
     }
+    const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setOpen(false) }
     window.addEventListener('pointerdown', onDown)
-    return () => window.removeEventListener('pointerdown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey) }
   }, [open])
   return (
     <MoveRoot ref={root}>
@@ -342,32 +339,43 @@ function MoveMenu({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Move ${deliverable.title} to another project`}
-        title="Move to another project"
+        aria-label={`Actions for ${name}`}
+        title="Actions"
         onClick={() => setOpen(value => !value)}
       >
-        <FolderInput aria-hidden="true" />
+        <MoreHorizontal aria-hidden="true" />
       </RowIcon>
       {open ? (
-        <MoveList role="menu" aria-label="Move to project">
-          {targets.map(target => (
-            <MoveItem
-              key={target.id}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false)
-                onMove(target.id)
-              }}
-            >
-              {target.name}
-            </MoveItem>
-          ))}
+        <MoveList role="menu" aria-label={`Actions for ${name}`}>
+          {entries.map((entry, index) =>
+            'heading' in entry ? (
+              <MenuHeading key={`h-${index}`}>{entry.heading}</MenuHeading>
+            ) : (
+              <MoveItem
+                key={`${entry.label}-${index}`}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false)
+                  entry.onSelect()
+                }}
+              >
+                {entry.label}
+              </MoveItem>
+            ),
+          )}
         </MoveList>
       ) : null}
     </MoveRoot>
   )
 }
+
+const MenuHeading = styled.div`
+  padding: 8px 10px 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--platform-colors-text-secondary);
+`
 
 const MoveRoot = styled.span`
   position: relative;
@@ -382,7 +390,7 @@ const MoveList = styled.div`
   display: flex;
   flex-direction: column;
   min-width: 180px;
-  max-height: 240px;
+  max-height: 360px;
   overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--projects-line);
@@ -418,12 +426,12 @@ const HoverRow = styled.div`
   }
 `
 
-/** A row's own action: a square raised icon button, always there, its word in the tooltip. */
+/** A row's actions button (⋯): small, raised, always there at the row's right edge; its menu says each action in words. */
 const RowIcon = styled.button`
   ${quiet}
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 22px;
   padding: 0;
   svg { width: 14px; height: 14px; }
 `
@@ -964,39 +972,19 @@ export function ProjectDetail({
                           }}
                         >
                           <NextSlot>
-                            {deliverable.id === nextDeliverableId ? (
-                              <NextChip>Next</NextChip>
-                            ) : deliverable.doneAt ? null : (
-                              <RowIcon
-                                type="button"
-                                onClick={() => onMakeNext(deliverable)}
-                                aria-label={`Make ${deliverable.title} the next action`}
-                                title="Make this the next action"
-                              >
-                                <Target aria-hidden="true" />
-                              </RowIcon>
-                            )}
+                            {deliverable.id === nextDeliverableId ? <NextChip>Next</NextChip> : null}
                           </NextSlot>
-                          <RowActions>
-                            <RowIcon type="button" onClick={() => startEditingDeliverable(deliverable)} aria-label={`Edit ${deliverable.title}`} title="Edit">
-                              <Pencil aria-hidden="true" />
-                            </RowIcon>
-                            {onMoveDeliverable && moveTargets.length ? (
-                              <MoveMenu
-                                deliverable={deliverable}
-                                targets={moveTargets}
-                                onMove={toProjectId => onMoveDeliverable(deliverable.id, toProjectId)}
-                              />
-                            ) : null}
-                            <RowIcon
-                              type="button"
-                              onClick={() => onRemoveDeliverable(deliverable.id)}
-                              aria-label={`Remove ${deliverable.title}`}
-                              title="Remove"
-                            >
-                              <Trash2 aria-hidden="true" />
-                            </RowIcon>
-                          </RowActions>
+                          <RowMenu
+                            name={deliverable.title}
+                            entries={[
+                              ...(deliverable.id === nextDeliverableId || deliverable.doneAt ? [] : [{ label: 'Make it the next action', onSelect: () => onMakeNext(deliverable) }]),
+                              { label: 'Edit', onSelect: () => startEditingDeliverable(deliverable) },
+                              { label: 'Remove', onSelect: () => onRemoveDeliverable(deliverable.id) },
+                              ...(onMoveDeliverable && moveTargets.length
+                                ? [{ heading: 'Move to' }, ...moveTargets.map(target => ({ label: target.name, onSelect: () => onMoveDeliverable(deliverable.id, target.id) }))]
+                                : []),
+                            ]}
+                          />
                           {deliverable.dueAt ? (
                             <Mono style={{ color: 'var(--platform-colors-text-secondary)', width: 56, textAlign: 'right', flex: 'none' }}>
                               {shortDate(deliverable.dueAt)}
@@ -1174,22 +1162,13 @@ export function ProjectDetail({
                           </div>
                         ) : null}
                       </div>
-                      <RowActions>
-                        <RowIcon
-                          type="button"
-                          onClick={() => {
-                            setEditingEntry(entry.id)
-                            setEntryDraft({ title: entry.title, body: entry.body })
-                          }}
-                          aria-label={`Edit ${entry.title}`}
-                          title="Edit"
-                        >
-                          <Pencil aria-hidden="true" />
-                        </RowIcon>
-                        <RowIcon type="button" onClick={() => onRemoveJournalEntry(entry.id)} aria-label={`Remove ${entry.title}`} title="Remove">
-                          <Trash2 aria-hidden="true" />
-                        </RowIcon>
-                      </RowActions>
+                      <RowMenu
+                        name={entry.title}
+                        entries={[
+                          { label: 'Edit', onSelect: () => { setEditingEntry(entry.id); setEntryDraft({ title: entry.title, body: entry.body }) } },
+                          { label: 'Remove', onSelect: () => onRemoveJournalEntry(entry.id) },
+                        ]}
+                      />
                     </JournalEntry>
                   </HoverRow>
                 ),
@@ -1224,16 +1203,7 @@ export function ProjectDetail({
                   <ActivityRow>
                     <ActivityDot $agent={row.lane === 'agent'} />
                     <span style={{ minWidth: 0, flex: 1 }}>{row.label}</span>
-                    <RowActions>
-                      <RowIcon
-                        type="button"
-                        onClick={() => promoteToJournal(row)}
-                        aria-label={`Add “${row.label}” to the journal`}
-                        title="Add to the journal"
-                      >
-                        <NotebookPen aria-hidden="true" />
-                      </RowIcon>
-                    </RowActions>
+                    <RowMenu name={row.label} entries={[{ label: 'Add to the journal', onSelect: () => promoteToJournal(row) }]} />
                     {row.lane === 'agent' ? (
                       <ActivityLane>agent</ActivityLane>
                     ) : null}
@@ -1523,27 +1493,13 @@ export function ProjectDetail({
                         {linkMeta(link)}
                       </Mono>
                     </LinkRow>
-                    <RowActions>
-                      <RowIcon
-                        type="button"
-                        onClick={() => {
-                          setRenamingLink(link.id)
-                          setLinkNameDraft(link.label)
-                        }}
-                        aria-label={`Rename ${link.label}`}
-                        title="Rename"
-                      >
-                        <Pencil aria-hidden="true" />
-                      </RowIcon>
-                      <RowIcon
-                        type="button"
-                        onClick={() => onRemoveLink(link.id)}
-                        aria-label={`Unlink ${link.label}`}
-                        title="Unlink"
-                      >
-                        <Unlink aria-hidden="true" />
-                      </RowIcon>
-                    </RowActions>
+                    <RowMenu
+                      name={link.label}
+                      entries={[
+                        { label: 'Rename', onSelect: () => { setRenamingLink(link.id); setLinkNameDraft(link.label) } },
+                        { label: 'Unlink', onSelect: () => onRemoveLink(link.id) },
+                      ]}
+                    />
                   </div>
                 </HoverRow>
               ),
