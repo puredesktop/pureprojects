@@ -30,10 +30,10 @@ const List = styled.ul`margin: 0; padding: 0; list-style: none; min-height: 0; o
 const Row = styled.li<{ $on: boolean }>`
   > button {
     all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: flex; flex-direction: column; gap: 1px; padding: 8px 12px 8px 10px;
-    border-left: 3px solid ${p => (p.$on ? 'var(--p-accent)' : 'transparent')}; background: ${p => (p.$on ? 'var(--p-accent-tint)' : 'transparent')};
-    box-shadow: inset 0 -1px 0 var(--p-rule);
+    background: ${p => (p.$on ? 'var(--p-chosen, var(--p-accent-tint))' : 'transparent')};
+    box-shadow: ${p => (p.$on ? 'var(--p-chosen-edge, inset 0 -1px 0 var(--p-rule))' : 'inset 0 -1px 0 var(--p-rule)')};
   }
-  > button:hover { background: ${p => (p.$on ? 'var(--p-accent-tint)' : 'var(--p-hover)')}; }
+  > button:hover { background: ${p => (p.$on ? 'var(--p-chosen, var(--p-accent-tint))' : 'var(--p-hover)')}; }
   > button:focus-visible { outline: 2px solid var(--p-accent); outline-offset: -2px; }
   .name { font-size: 13px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .next { font-size: 12px; line-height: 1.3; color: var(--p-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

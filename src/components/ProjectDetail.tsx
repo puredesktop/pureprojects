@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
+import { quiet, statusLabel } from '../ui/styles'
+import { FolderInput, NotebookPen, Pencil, Target, Trash2, Unlink } from 'lucide-react'
 import {
   completedCount,
   daysUntil,
@@ -172,8 +174,6 @@ const JournalEntry = styled.div<{ $latest?: boolean }>`
   gap: 14px;
   padding: 14px;
   border: 1px solid var(--projects-line);
-  border-left: ${({ $latest }) =>
-    $latest ? '2px solid var(--projects-accent)' : '1px solid var(--projects-line)'};
   background: var(--platform-colors-elevated);
 `
 
@@ -181,9 +181,10 @@ const WaitingCard = styled.div`
   display: flex;
   gap: 10px;
   padding: 11px 12px;
-  border: 1px solid var(--platform-colors-semantic-orange-border, #e3c98f);
-  background: var(--platform-colors-semantic-orange-muted, #f3e5c8);
-  color: var(--platform-colors-semantic-orange-text, #7a5114);
+  /* A notice: a full outline in its status colour on grey, ink words. */
+  border: 1px solid var(--b-amber);
+  background: var(--n-panel);
+  color: var(--n-ink);
 `
 
 const LinkRow = styled.button`
@@ -247,11 +248,12 @@ const InlineTextarea = styled.textarea`
  * One slot, one meaning: it either says this deliverable IS next, or offers
  * to make it next. Fixed width so a row does not reshape under the cursor.
  */
+/** Room for the next marker or its button on every row, so the row's buttons line up down the list. */
 const NextSlot = styled.div`
   display: flex;
   flex: none;
   justify-content: flex-end;
-  width: 74px;
+  width: 52px;
 `
 
 const MakeNextButton = styled.button`
@@ -262,13 +264,9 @@ const MakeNextButton = styled.button`
   background: transparent;
   color: var(--platform-colors-text-secondary);
   font: inherit;
-  font-family: var(--platform-typography-font-family-mono);
+  font-family: var(--platform-typography-font-family);
   font-size: var(--pure-chrome-label-size);
-  letter-spacing: var(--pure-chrome-label-tracking);
-  text-transform: uppercase;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 120ms ease;
 
   &:hover {
     border-color: var(--projects-line);
@@ -280,8 +278,6 @@ const RowActions = styled.div`
   display: flex;
   align-items: center;
   gap: 4px;
-  opacity: 0;
-  transition: opacity 120ms ease;
 `
 
 /** Rows shown before "Show all" — a screenful of recent, not a history. */
@@ -342,15 +338,16 @@ function MoveMenu({
   }, [open])
   return (
     <MoveRoot ref={root}>
-      <IconButton
+      <RowIcon
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Move ${deliverable.title} to another project`}
+        title="Move to another project"
         onClick={() => setOpen(value => !value)}
       >
-        Move to…
-      </IconButton>
+        <FolderInput aria-hidden="true" />
+      </RowIcon>
       {open ? (
         <MoveList role="menu" aria-label="Move to project">
           {targets.map(target => (
@@ -389,7 +386,7 @@ const MoveList = styled.div`
   overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--projects-line);
-  border-radius: 10px;
+  border-radius: var(--pure-chrome-radius, 3px);
   background: var(--platform-colors-elevated, var(--platform-colors-surface));
   box-shadow: 0 12px 30px rgba(16, 22, 40, 0.16);
 `
@@ -397,7 +394,7 @@ const MoveList = styled.div`
 const MoveItem = styled.button`
   padding: 6px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--pure-chrome-radius, 3px);
   background: transparent;
   color: var(--platform-colors-text);
   font: inherit;
@@ -421,22 +418,23 @@ const HoverRow = styled.div`
   }
 `
 
-const IconButton = styled.button`
+/** A row's own action: a square raised icon button, always there, its word in the tooltip. */
+const RowIcon = styled.button`
+  ${quiet}
   flex: none;
-  height: 22px;
-  padding: 0 7px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--platform-colors-text-secondary);
-  font: inherit;
-  font-size: var(--pure-chrome-ui-size);
-  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  svg { width: 14px; height: 14px; }
+`
 
-  &:hover {
-    border-color: var(--projects-line);
-    background: var(--pure-chrome-hover);
-    color: var(--platform-colors-text);
-  }
+/** A section's own action (Add, Log an entry, New…): a small raised button, always there. */
+const IconButton = styled.button`
+  ${quiet}
+  flex: none;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
 `
 
 /**
@@ -452,15 +450,9 @@ const NextActionBar = styled.div<{ $empty?: boolean }>`
   flex: none;
   padding: 15px 24px;
   border-bottom: 1px solid var(--projects-line);
-  border-left: 3px solid
-    ${({ $empty }) =>
-      $empty
-        ? 'var(--platform-colors-semantic-orange, #c98a2b)'
-        : 'var(--projects-accent)'};
-  background: ${({ $empty }) =>
-    $empty
-      ? 'var(--platform-colors-semantic-orange-muted, #f3e5c8)'
-      : 'var(--platform-colors-elevated)'};
+  /* The headline in words, never a coloured bar; a stalled project (no next action) is a notice: amber outline on grey. */
+  box-shadow: ${({ $empty }) => ($empty ? 'inset 0 0 0 1px var(--b-amber)' : 'none')};
+  background: ${({ $empty }) => ($empty ? 'var(--n-panel)' : 'var(--n-sheet)')};
 `
 
 const ArchivedBar = styled.div`
@@ -470,8 +462,7 @@ const ArchivedBar = styled.div`
   flex: none;
   padding: 15px 24px;
   border-bottom: 1px solid var(--projects-line);
-  border-left: 3px solid var(--platform-colors-border-strong, #dadade);
-  background: var(--platform-colors-bg);
+  background: var(--n-panel);
 `
 
 const NextActionCopy = styled.div`
@@ -483,15 +474,11 @@ const NextActionCopy = styled.div`
 `
 
 const NextActionLabel = styled.span<{ $empty?: boolean }>`
-  color: ${({ $empty }) =>
-    $empty
-      ? 'var(--platform-colors-semantic-orange-text, #7a5114)'
-      : 'var(--projects-accent-text)'};
-  font-family: var(--platform-typography-font-family-mono);
+  color: ${({ $empty }) => ($empty ? 'var(--p-needs-you-deep)' : 'var(--n-soft)')};
+  font-weight: 600;
+  font-family: var(--platform-typography-font-family);
   font-size: var(--pure-chrome-label-size);
   font-weight: 500;
-  letter-spacing: var(--pure-chrome-label-tracking);
-  text-transform: uppercase;
 `
 
 const NextActionText = styled.div<{ $empty?: boolean }>`
@@ -499,19 +486,12 @@ const NextActionText = styled.div<{ $empty?: boolean }>`
   font-weight: 500;
   line-height: 1.35;
   color: ${({ $empty }) =>
-    $empty ? 'var(--platform-colors-semantic-orange-text, #7a5114)' : 'inherit'};
+    $empty ? 'var(--n-soft)' : 'inherit'};
 `
 
+/** Marks the deliverable that is the next action: a label in the working colour, nothing to press. */
 const NextChip = styled.span`
-  flex: none;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--projects-accent) 14%, transparent);
-  color: var(--projects-accent-text);
-  font-family: var(--platform-typography-font-family-mono);
-  font-size: var(--pure-chrome-label-size);
-  letter-spacing: var(--pure-chrome-label-tracking);
-  text-transform: uppercase;
+  ${statusLabel('working')}
 `
 
 const ExportBar = styled.div`
@@ -567,14 +547,9 @@ const Notice = styled.div<{ $tone?: 'error' | 'info' }>`
       $tone === 'info'
         ? 'var(--projects-line)'
         : 'var(--platform-colors-semantic-red-border, #dfb7b1)'};
-  background: ${({ $tone }) =>
-    $tone === 'info'
-      ? 'var(--platform-colors-bg)'
-      : 'var(--platform-colors-semantic-red-muted, #f4dfdc)'};
-  color: ${({ $tone }) =>
-    $tone === 'info'
-      ? 'var(--platform-colors-text-secondary)'
-      : 'var(--platform-colors-semantic-red-text, #8a2d24)'};
+  background: var(--n-panel);
+  color: ${({ $tone }) => ($tone === 'info' ? 'var(--n-soft)' : 'var(--n-ink)')};
+  box-shadow: ${({ $tone }) => ($tone === 'info' ? 'none' : 'inset 0 0 0 1px var(--p-failed-text)')};
   font-size: var(--platform-typography-font-size-sm, 13px);
 `
 
@@ -992,18 +967,20 @@ export function ProjectDetail({
                             {deliverable.id === nextDeliverableId ? (
                               <NextChip>Next</NextChip>
                             ) : deliverable.doneAt ? null : (
-                              <MakeNextButton
+                              <RowIcon
+                                type="button"
                                 onClick={() => onMakeNext(deliverable)}
                                 aria-label={`Make ${deliverable.title} the next action`}
+                                title="Make this the next action"
                               >
-                                Make next
-                              </MakeNextButton>
+                                <Target aria-hidden="true" />
+                              </RowIcon>
                             )}
                           </NextSlot>
                           <RowActions>
-                            <IconButton onClick={() => startEditingDeliverable(deliverable)}>
-                              Edit
-                            </IconButton>
+                            <RowIcon type="button" onClick={() => startEditingDeliverable(deliverable)} aria-label={`Edit ${deliverable.title}`} title="Edit">
+                              <Pencil aria-hidden="true" />
+                            </RowIcon>
                             {onMoveDeliverable && moveTargets.length ? (
                               <MoveMenu
                                 deliverable={deliverable}
@@ -1011,19 +988,22 @@ export function ProjectDetail({
                                 onMove={toProjectId => onMoveDeliverable(deliverable.id, toProjectId)}
                               />
                             ) : null}
-                            <IconButton
+                            <RowIcon
+                              type="button"
                               onClick={() => onRemoveDeliverable(deliverable.id)}
                               aria-label={`Remove ${deliverable.title}`}
+                              title="Remove"
                             >
-                              Remove
-                            </IconButton>
+                              <Trash2 aria-hidden="true" />
+                            </RowIcon>
                           </RowActions>
                           {deliverable.dueAt ? (
-                            <Mono style={{ color: 'var(--platform-colors-text-secondary)' }}>
+                            <Mono style={{ color: 'var(--platform-colors-text-secondary)', width: 56, textAlign: 'right', flex: 'none' }}>
                               {shortDate(deliverable.dueAt)}
                             </Mono>
                           ) : (
                             <SetDateLink
+                              style={{ width: 56, textAlign: 'right', flex: 'none' }}
                               onClick={() => startEditingDeliverable(deliverable)}
                             >
                               set date
@@ -1195,17 +1175,20 @@ export function ProjectDetail({
                         ) : null}
                       </div>
                       <RowActions>
-                        <IconButton
+                        <RowIcon
+                          type="button"
                           onClick={() => {
                             setEditingEntry(entry.id)
                             setEntryDraft({ title: entry.title, body: entry.body })
                           }}
+                          aria-label={`Edit ${entry.title}`}
+                          title="Edit"
                         >
-                          Edit
-                        </IconButton>
-                        <IconButton onClick={() => onRemoveJournalEntry(entry.id)}>
-                          Remove
-                        </IconButton>
+                          <Pencil aria-hidden="true" />
+                        </RowIcon>
+                        <RowIcon type="button" onClick={() => onRemoveJournalEntry(entry.id)} aria-label={`Remove ${entry.title}`} title="Remove">
+                          <Trash2 aria-hidden="true" />
+                        </RowIcon>
                       </RowActions>
                     </JournalEntry>
                   </HoverRow>
@@ -1242,12 +1225,14 @@ export function ProjectDetail({
                     <ActivityDot $agent={row.lane === 'agent'} />
                     <span style={{ minWidth: 0, flex: 1 }}>{row.label}</span>
                     <RowActions>
-                      <IconButton
+                      <RowIcon
+                        type="button"
                         onClick={() => promoteToJournal(row)}
                         aria-label={`Add “${row.label}” to the journal`}
+                        title="Add to the journal"
                       >
-                        Add to journal
-                      </IconButton>
+                        <NotebookPen aria-hidden="true" />
+                      </RowIcon>
                     </RowActions>
                     {row.lane === 'agent' ? (
                       <ActivityLane>agent</ActivityLane>
@@ -1539,21 +1524,25 @@ export function ProjectDetail({
                       </Mono>
                     </LinkRow>
                     <RowActions>
-                      <IconButton
+                      <RowIcon
+                        type="button"
                         onClick={() => {
                           setRenamingLink(link.id)
                           setLinkNameDraft(link.label)
                         }}
                         aria-label={`Rename ${link.label}`}
+                        title="Rename"
                       >
-                        Rename
-                      </IconButton>
-                      <IconButton
+                        <Pencil aria-hidden="true" />
+                      </RowIcon>
+                      <RowIcon
+                        type="button"
                         onClick={() => onRemoveLink(link.id)}
                         aria-label={`Unlink ${link.label}`}
+                        title="Unlink"
                       >
-                        Unlink
-                      </IconButton>
+                        <Unlink aria-hidden="true" />
+                      </RowIcon>
                     </RowActions>
                   </div>
                 </HoverRow>

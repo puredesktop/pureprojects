@@ -1,4 +1,5 @@
 import styled, { css } from 'styled-components'
+import { primaryLook, quiet, quietLabel, statusLabel } from '../ui/styles'
 import type { ProjectStatus } from '../types'
 
 /**
@@ -95,14 +96,12 @@ export const Body = styled.div`
   min-height: 0;
 `
 
-/** A section label: the platform's mono, tracked, uppercase. */
+/** A section label: the platform sans, small and plain, never tracked capitals. */
 export const Kicker = styled.div`
   padding: 0 var(--pure-chrome-inset) 6px;
-  font-family: var(--platform-typography-font-family-mono);
-  font-size: var(--pure-chrome-label-size);
-  font-weight: 500;
-  letter-spacing: var(--pure-chrome-label-tracking);
-  text-transform: uppercase;
+  font-family: var(--platform-typography-font-family);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--pure-chrome-muted);
 `
 
@@ -131,12 +130,10 @@ export const ListCard = styled.section`
   min-height: 0;
   margin: 4px var(--pure-chrome-inset) 12px;
   overflow: hidden;
-  border: 1px solid var(--glass-edge, var(--projects-line));
-  border-radius: 16px;
-  background: var(--glass-panel, var(--pure-chrome-paper));
-  backdrop-filter: var(--glass-blur, none);
-  -webkit-backdrop-filter: var(--glass-blur, none);
-  box-shadow: var(--glass-shadow, none);
+  /* A plain sheet on the desk: a hairline, square corners, no frost or shadow. */
+  border: 1px solid var(--n-line);
+  border-radius: 3px;
+  background: var(--n-sheet);
 `
 
 const rowGrid = css`
@@ -156,11 +153,9 @@ export const HeaderRow = styled.div`
   padding-bottom: 10px;
   border-bottom: 1px solid var(--glass-line, var(--projects-line));
   background: transparent;
-  font-family: var(--platform-typography-font-family-mono);
-  font-size: var(--pure-chrome-label-size);
-  font-weight: 500;
-  letter-spacing: var(--pure-chrome-label-tracking);
-  text-transform: uppercase;
+  font-family: var(--platform-typography-font-family);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--pure-chrome-muted);
 `
 
@@ -289,18 +284,15 @@ const STATUS_TONE: Record<ProjectStatus, { bg: string; fg: string }> = {
   },
 }
 
+/** A status is a label in the system colour of what it says: idea grey, active blue, waiting amber, done green, overdue red. */
 export const StatusChip = styled.span<{ $status: ProjectStatus; $overdue?: boolean }>`
-  display: inline-block;
-  flex: none;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: ${({ $status, $overdue }) =>
-    $overdue ? 'var(--platform-colors-semantic-red-muted, #f4dfdc)' : STATUS_TONE[$status].bg};
-  color: ${({ $status, $overdue }) =>
-    $overdue ? 'var(--platform-colors-semantic-red-text, #8a2d24)' : STATUS_TONE[$status].fg};
-  font-size: var(--pure-chrome-label-size);
-  letter-spacing: var(--pure-chrome-label-tracking);
-  text-transform: uppercase;
+  ${({ $status, $overdue }) =>
+    $overdue ? statusLabel('failed')
+    : $status === 'active' ? statusLabel('working')
+    : $status === 'waiting' ? statusLabel('needs-you')
+    : $status === 'done' ? statusLabel('done')
+    : quietLabel}
+  text-transform: capitalize;
 `
 
 export const Bar = styled.span`
@@ -331,30 +323,10 @@ export const Footer = styled.div.attrs(chrome('meta'))`
   background: transparent;
 `
 
+/** Every button raised and pressed; the one main action ($primary) is Projects' colour, solid. */
 export const Button = styled.button<{ $primary?: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  height: var(--pure-chrome-control-height);
-  padding: 0 10px;
-  border: 1px solid
-    ${({ $primary }) =>
-      $primary ? 'var(--pure-chrome-accent)' : 'var(--platform-colors-border-strong)'};
-  border-radius: 7px;
-  background: ${({ $primary }) =>
-    $primary ? 'var(--pure-chrome-accent)' : 'var(--pure-chrome-surface)'};
-  color: ${({ $primary }) =>
-    $primary ? 'var(--pure-chrome-on-accent)' : 'var(--platform-colors-text)'};
-  font: inherit;
-  font-size: var(--platform-typography-font-size-sm, 13px);
-  cursor: pointer;
-
-  &:hover {
-    filter: ${({ $primary }) => ($primary ? 'brightness(0.94)' : 'none')};
-    background: ${({ $primary }) =>
-      $primary ? 'var(--pure-chrome-accent)' : 'var(--pure-chrome-hover)'};
-  }
+  ${quiet}
+  ${({ $primary }) => ($primary ? primaryLook : '')}
 `
 
 export const Attention = styled.span<{ $tone: 'warn' | 'danger' }>`
