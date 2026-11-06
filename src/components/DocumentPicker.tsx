@@ -72,11 +72,9 @@ const HeadRow = styled.div`
   padding: 8px 12px;
   border-bottom: 1px solid var(--pure-chrome-line);
   background: var(--pure-chrome-bar);
-  font-family: var(--platform-typography-font-family-mono);
+  font-family: var(--platform-typography-font-family);
   font-size: var(--pure-chrome-label-size);
   font-weight: 500;
-  letter-spacing: var(--pure-chrome-label-tracking);
-  text-transform: uppercase;
   color: var(--pure-chrome-muted);
 `
 
