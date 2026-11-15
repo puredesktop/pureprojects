@@ -429,7 +429,7 @@
         },
         {
         "name": "exportDocumentsPdf",
-        "risk": "external",
+        "risk": "write",
           "description": "Convert a project's documents to PDF, written beside each document in the workspace. Only documents created in this app can be converted; files attached to the project are already whatever they are and are reported as skipped. Omit paths to convert every document on the project.",
           "inputSchema": {
             "type": "object",
@@ -448,7 +448,7 @@
         },
         {
         "name": "exportProjectZip",
-        "risk": "external",
+        "risk": "write",
           "description": "Bundle a project's documents into a zip in the workspace Documents folder. Documents created here go in as PDFs; attached files go in as themselves. The result returns the saved path.",
           "inputSchema": {
             "type": "object",
