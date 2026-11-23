@@ -1,15 +1,55 @@
 import type { Extensions } from '@tiptap/react'
 import type { Project, ProjectsStore } from '../types'
 
-/** Keep in sync with `plugin.json` → `app.agents.tools[].name`. */
-export const PUREPROJECTS_AGENT_TOOL_NAMES = [
+/**
+ * Exposed PureProjects operations (must stay in sync 1:1 with `plugin.json` → `app.agents.tools[].name`).
+ *
+ * 3-tier exposure (built on `@purescience/platform-ui/bridge/appFunctions`):
+ *   1. 6 composite `function` workflows (`fn_*`) — collapse 3–15 atomic round-trips each
+ *   2. 6 core atomic tools (~26% of 23) — indispensable direct read/write verbs + permanent-delete `deleteProject`
+ *   3. 3 universal escape-hatch meta-tools (`discoverAppTools`, `callExtendedReadTool`, `callExtendedTool`)
+ *      providing full on-demand access to the remaining 17 specialist atomic tools.
+ */
+export const PUREPROJECTS_FUNCTION_NAMES = [
+  'fn_portfolioBriefing',
+  'fn_getProjectDossier',
+  'fn_kickoffProject',
+  'fn_updateProjectProgress',
+  'fn_batchRebalanceProjects',
+  'fn_prepareHandoverPackage',
+] as const
+
+export const PUREPROJECTS_CORE_TOOL_NAMES = [
   'getProjectsContext',
   'listProjects',
   'getProject',
-  'createProject',
   'updateProject',
   'addDeliverable',
+  'deleteProject',
+] as const
+
+export const PUREPROJECTS_META_TOOL_NAMES = [
+  'discoverAppTools',
+  'callExtendedReadTool',
+  'callExtendedTool',
+] as const
+
+export const EXPOSED_TOOL_NAMES = [
+  ...PUREPROJECTS_FUNCTION_NAMES,
+  ...PUREPROJECTS_CORE_TOOL_NAMES,
+  ...PUREPROJECTS_META_TOOL_NAMES,
+] as const
+
+/** Keep in sync with `plugin.json` → `app.agents.tools[].name`. */
+export const PUREPROJECTS_AGENT_TOOL_NAMES = EXPOSED_TOOL_NAMES
+
+export const PUREPROJECTS_EXTENDED_TOOL_NAMES = [
+  'createProject',
+  'reorderProject',
+  'archiveProject',
   'updateDeliverable',
+  'moveDeliverable',
+  'removeDeliverable',
   'setWaitingOn',
   'logJournalEntry',
   'createDocument',
@@ -17,15 +57,15 @@ export const PUREPROJECTS_AGENT_TOOL_NAMES = [
   'insertDocumentBlock',
   'replaceDocumentBlock',
   'deleteDocumentBlock',
-  'exportDocumentsPdf',
-  'exportProjectZip',
-  'reorderProject',
   'linkDocument',
   'removeLink',
-  'removeDeliverable',
-  'moveDeliverable',
-  'archiveProject',
-  'deleteProject',
+  'exportDocumentsPdf',
+  'exportProjectZip',
+] as const
+
+export const PUREPROJECTS_ALL_ATOMIC_TOOL_NAMES = [
+  ...PUREPROJECTS_CORE_TOOL_NAMES,
+  ...PUREPROJECTS_EXTENDED_TOOL_NAMES,
 ] as const
 
 export const PUREPROJECTS_AGENT_LOG_LABEL = 'pureprojects'

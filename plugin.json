@@ -27,8 +27,538 @@
     "agents": {
       "tools": [
         {
-        "name": "getProjectsContext",
-        "risk": "read",
+          "name": "fn_portfolioBriefing",
+          "risk": "read",
+          "description": "Generate a single-call executive portfolio briefing across PureProjects: currently open project, status totals, overdue and upcoming projects and deliverables, stalled waits sorted oldest-first and grouped by person, per-person workload, area breakdown, and a hygiene audit with health score. Filter optionally by area, status, person, or query.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "area": {
+                "type": "string",
+                "description": "Optional area filter (case-insensitive)."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "idea",
+                  "active",
+                  "waiting",
+                  "done"
+                ],
+                "description": "Optional project status filter."
+              },
+              "person": {
+                "type": "string",
+                "description": "Optional person name filter (matches project people, deliverable owners, or waits)."
+              },
+              "query": {
+                "type": "string",
+                "description": "Optional free-text search across projects."
+              },
+              "includeArchived": {
+                "type": "boolean",
+                "description": "Include archived projects alongside living ones (default false)."
+              },
+              "horizonDays": {
+                "type": "number",
+                "description": "Days ahead for upcoming project and deliverable deadlines (default 7, range 1–90)."
+              },
+              "staleWaitDays": {
+                "type": "number",
+                "description": "Days waiting before flagging a wait as stale (default 7, range 1–90)."
+              },
+              "staleProjectDays": {
+                "type": "number",
+                "description": "Days without updates before flagging an active project as stale (default 14, range 1–180)."
+              },
+              "asOfDate": {
+                "type": "string",
+                "description": "Optional YYYY-MM-DD or ISO reference date (defaults to today)."
+              }
+            }
+          },
+          "requiresApproval": false
+        },
+        {
+          "name": "fn_getProjectDossier",
+          "risk": "read",
+          "description": "Retrieve a complete operational dossier for one project (defaults to the currently open project when projectId is omitted): full metadata, categorized open/overdue/completed deliverables, next-action match, owner breakdown, aged waits, journal history, categorized links, and optional block previews of linked PureWriter documents.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string",
+                "description": "Target project id. Omit to inspect the currently open project."
+              },
+              "includeDocumentPreviews": {
+                "type": "boolean",
+                "description": "Read linked .document packages and include leading block previews (default false)."
+              },
+              "previewBlockLimit": {
+                "type": "number",
+                "description": "Maximum blocks per document preview when includeDocumentPreviews is true (default 5, range 1–30)."
+              },
+              "journalLimit": {
+                "type": "number",
+                "description": "Maximum recent journal entries to include (default 25, range 1–100)."
+              },
+              "asOfDate": {
+                "type": "string",
+                "description": "Optional YYYY-MM-DD or ISO reference date (defaults to today)."
+              }
+            }
+          },
+          "requiresApproval": false
+        },
+        {
+          "name": "fn_kickoffProject",
+          "risk": "write",
+          "description": "Create and scaffold a complete PureProjects project in one atomic call: sets project metadata, adds initial deliverables (optionally promoting the first as nextAction), records initial waits, links reference documents or web pages, appends a kickoff journal entry, and optionally creates a linked PureWriter document. Call getProjectsContext first.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Project name."
+              },
+              "summary": {
+                "type": "string",
+                "description": "Short description of the project goal."
+              },
+              "area": {
+                "type": "string",
+                "description": "Existing or new area grouping."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "idea",
+                  "active"
+                ],
+                "description": "Initial status (default \"active\"; becomes \"waiting\" automatically if waitingOn entries are given)."
+              },
+              "nextAction": {
+                "type": "string",
+                "description": "Explicit first physical step."
+              },
+              "autoSetNextAction": {
+                "type": "boolean",
+                "description": "When nextAction is omitted and deliverables are supplied, set nextAction to the first deliverable title (default true)."
+              },
+              "dueAt": {
+                "type": "string",
+                "description": "ISO project deadline."
+              },
+              "people": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "People involved in the project."
+              },
+              "deliverables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "type": "string"
+                    },
+                    "dueAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "title"
+                  ]
+                },
+                "description": "Initial deliverables/todos to create."
+              },
+              "waitingOn": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "person": {
+                      "type": "string"
+                    },
+                    "what": {
+                      "type": "string"
+                    },
+                    "askedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "person"
+                  ]
+                },
+                "description": "Initial outstanding waits to record."
+              },
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "Workspace path or https:// URL."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "document",
+                        "mail",
+                        "event",
+                        "web"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "path"
+                  ]
+                },
+                "description": "Initial reference links to attach."
+              },
+              "journalEntry": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "description": "Optional kickoff decision/context entry for the journal."
+              },
+              "initialDocument": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "html": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "description": "Optional PureWriter .document package to create and link."
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "requiresApproval": true
+        },
+        {
+          "name": "fn_updateProjectProgress",
+          "risk": "write",
+          "description": "Apply a coordinated check-in to one project in a single atomic transaction (defaults to the currently open project): add and update deliverables, resolve or stack waits, promote a deliverable to nextAction or update project fields, and log a journal entry. Supports dryRun preview without mutating.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string",
+                "description": "Target project id. Omit to target the currently open project."
+              },
+              "dryRun": {
+                "type": "boolean",
+                "description": "Preview changes without saving (default false)."
+              },
+              "addDeliverables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "type": "string"
+                    },
+                    "dueAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "title"
+                  ]
+                }
+              },
+              "updateDeliverables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "deliverableId": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "type": "string"
+                    },
+                    "dueAt": {
+                      "type": "string"
+                    },
+                    "done": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deliverableId"
+                  ]
+                }
+              },
+              "promoteDeliverableId": {
+                "type": "string",
+                "description": "Open deliverable id to promote as the project nextAction."
+              },
+              "resolveWaitingIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Specific waitingIds that arrived and should be cleared."
+              },
+              "clearAllWaits": {
+                "type": "boolean",
+                "description": "Clear every outstanding wait on the project."
+              },
+              "addWaits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "person": {
+                      "type": "string"
+                    },
+                    "what": {
+                      "type": "string"
+                    },
+                    "askedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "person"
+                  ]
+                },
+                "description": "New waits to stack onto the project."
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "idea",
+                  "active",
+                  "done"
+                ],
+                "description": "Set status explicitly (use addWaits for \"waiting\")."
+              },
+              "dueAt": {
+                "type": "string",
+                "description": "ISO due date, or empty string to clear."
+              },
+              "area": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "people": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "journalEntry": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              }
+            }
+          },
+          "requiresApproval": true
+        },
+        {
+          "name": "fn_batchRebalanceProjects",
+          "risk": "write",
+          "description": "Execute a validated multi-project review and rebalancing batch in one atomic mutation: update fields, add or remove people, archive or restore projects, append journal entries across multiple projects, and move deliverables between projects. Supports dryRun preview without persisting.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "dryRun": {
+                "type": "boolean",
+                "description": "Preview every change without writing to the store (default false)."
+              },
+              "projectUpdates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "area": {
+                      "type": "string"
+                    },
+                    "dueAt": {
+                      "type": "string"
+                    },
+                    "nextAction": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "idea",
+                        "active",
+                        "done"
+                      ]
+                    },
+                    "addPeople": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removePeople": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "archive": {
+                      "type": "boolean",
+                      "description": "true to archive, false to restore into view."
+                    },
+                    "journalEntry": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "body": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "title"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "projectId"
+                  ]
+                }
+              },
+              "deliverableMoves": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fromProjectId": {
+                      "type": "string"
+                    },
+                    "deliverableId": {
+                      "type": "string"
+                    },
+                    "toProjectId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fromProjectId",
+                    "deliverableId",
+                    "toProjectId"
+                  ]
+                }
+              }
+            }
+          },
+          "requiresApproval": true
+        },
+        {
+          "name": "fn_prepareHandoverPackage",
+          "risk": "write",
+          "description": "Assemble a project handover package in one call (defaults to the currently open project): optionally generate and link a PureWriter status-brief document summarizing deliverables, waits, and decisions, export the project documents as PDFs and/or a ZIP archive, and optionally log the handover in the project journal. Call getProjectsContext first.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string",
+                "description": "Target project id. Omit to use the currently open project."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "zip",
+                  "pdf",
+                  "both"
+                ],
+                "description": "Export output format (default \"zip\")."
+              },
+              "includeStatusBrief": {
+                "type": "boolean",
+                "description": "Generate and link a fresh PureWriter status-brief .document before exporting (default false)."
+              },
+              "briefTitle": {
+                "type": "string",
+                "description": "Optional custom title for the generated status brief."
+              },
+              "extraBriefHtml": {
+                "type": "string",
+                "description": "Optional extra HTML section appended to the generated status brief."
+              },
+              "documentPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Optional subset of linked document paths to export. Omit to export every document on the project."
+              },
+              "logHandoverInJournal": {
+                "type": "boolean",
+                "description": "Append a journal entry recording the handover bundle (default false)."
+              },
+              "journalNote": {
+                "type": "string",
+                "description": "Optional custom note included in the handover journal entry."
+              }
+            }
+          },
+          "requiresApproval": true
+        },
+        {
+          "name": "getProjectsContext",
+          "risk": "read",
           "description": "Overview of projects, including openProject (the project currently on screen), totals by status, overdue work, waits and missing next actions. Call first. Unqualified add/todo requests target openProject; act without asking for optional owner or date details.",
           "inputSchema": {
             "type": "object",
@@ -37,8 +567,8 @@
           "requiresApproval": false
         },
         {
-        "name": "listProjects",
-        "risk": "read",
+          "name": "listProjects",
+          "risk": "read",
           "description": "List projects with their status, next action, people, due date and area. Filter by status, area, or a free-text query. Use before proposing changes so ids and current values are exact.",
           "inputSchema": {
             "type": "object",
@@ -70,8 +600,8 @@
           "requiresApproval": false
         },
         {
-        "name": "getProject",
-        "risk": "read",
+          "name": "getProject",
+          "risk": "read",
           "description": "One project in full: description, deliverables with owners and due dates, journal entries, linked documents, and what it is waiting on.",
           "inputSchema": {
             "type": "object",
@@ -88,47 +618,8 @@
           "requiresApproval": false
         },
         {
-          "name": "createProject",
-          "description": "Create a project. Name it the way the user refers to it. Set area, due date and next action when they are known - a project with no next action is the state that quietly kills knowledge work.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "Project name."
-              },
-              "summary": {
-                "type": "string",
-                "description": "One or two sentences on what this project is."
-              },
-              "area": {
-                "type": "string",
-                "description": "Grouping such as Writing, Clients, Admin."
-              },
-              "nextAction": {
-                "type": "string",
-                "description": "The single next physical step."
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO date the project is due."
-              },
-              "people": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "People involved, by name."
-              }
-            },
-            "required": [
-              "name"
-            ]
-          },
-          "requiresApproval": true
-        },
-        {
           "name": "updateProject",
+          "risk": "write",
           "description": "Change a project's status, next action, due date, area, summary or people. Only the fields you pass are changed.",
           "inputSchema": {
             "type": "object",
@@ -176,6 +667,7 @@
         },
         {
           "name": "addDeliverable",
+          "risk": "write",
           "description": "Add a todo/deliverable. An unqualified request such as add X targets the currently open project: omit projectId to use it. Act without asking for optional details; omit owner for the user and dueAt when no date was given.",
           "inputSchema": {
             "type": "object",
@@ -204,348 +696,8 @@
           "requiresApproval": true
         },
         {
-          "name": "updateDeliverable",
-          "description": "Complete, reopen, retitle or re-date a deliverable.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string"
-              },
-              "deliverableId": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string"
-              },
-              "owner": {
-                "type": "string"
-              },
-              "dueAt": {
-                "type": "string"
-              },
-              "done": {
-                "type": "boolean",
-                "description": "true completes it, false reopens it."
-              }
-            },
-            "required": [
-              "projectId",
-              "deliverableId"
-            ]
-          },
-          "requiresApproval": true
-        },
-        {
-          "name": "setWaitingOn",
-          "description": "Record that a project is waiting on someone, or clear a wait that arrived. Waits stack: passing person ADDS one. Passing resolveWaitingId clears that one; passing neither clears them all. The status follows the list — the project is 'waiting' while any remain and returns to 'active' when the last clears.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string"
-              },
-              "person": {
-                "type": "string",
-                "description": "Who owes it. Adds a wait — a project can be waiting on several people at once, so this never replaces an existing one."
-              },
-              "what": {
-                "type": "string",
-                "description": "What is owed."
-              },
-              "askedAt": {
-                "type": "string",
-                "description": "ISO date they were asked. Defaults to today."
-              },
-              "resolveWaitingId": {
-                "type": "string",
-                "description": "Id of the wait that arrived (waitingId from listProjects/getProject). Omit both this and person to clear every outstanding wait."
-              }
-            },
-            "required": [
-              "projectId"
-            ]
-          },
-          "requiresApproval": true
-        },
-        {
-          "name": "logJournalEntry",
-          "description": "Append a dated entry to a project's journal: a decision made, a milestone reached, something that changed. The journal is append-only and is the project's memory - write what a colleague would need to understand the decision months later, not a list of activity.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string",
-                "description": "One line naming what happened."
-              },
-              "body": {
-                "type": "string",
-                "description": "Two or three sentences of substance."
-              }
-            },
-            "required": [
-              "projectId",
-              "title"
-            ]
-          },
-          "requiresApproval": true
-        },
-        {
-          "name": "createDocument",
-          "description": "Write a new document for a project. Creates a real PureWriter .document package in PureDocuments and links it to the project, so the user can open it here or in Writer, and other agents can find it through context search. Use this when the user asks for notes, a brief, an outline or a draft that belongs to a project - not for content that belongs in the journal.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string",
-                "description": "Document title; also the package name."
-              },
-              "html": {
-                "type": "string",
-                "description": "Optional initial content as simple HTML (h1/h2/p/ul/ol/blockquote). Omit for an empty document with a heading."
-              }
-            },
-            "required": [
-              "projectId",
-              "title"
-            ]
-          },
-          "requiresApproval": true
-        },
-        {
-        "name": "readDocument",
-        "risk": "read",
-          "description": "Read a linked .document package as a numbered list of blocks. Call this before editing one: block indexes are how the edit tools address content, and they shift after every insert or delete. For a long document pass fromIndex and limit to read a stretch; blockCount is always the whole document's.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string",
-                "description": "The document's path, as listed on the project by getProject."
-              },
-              "fromIndex": {
-                "type": "number",
-                "description": "Optional. First block to return. Defaults to 0."
-              },
-              "limit": {
-                "type": "number",
-                "description": "Optional. Most blocks to return. Omit for every block from fromIndex on."
-              }
-            },
-            "required": [
-              "path"
-            ]
-          }
-        },
-        {
-          "name": "insertDocumentBlock",
-          "description": "Add a block to a linked document. Pass html for prose, or mermaid for a diagram - give the diagram source only (for example 'graph TD; A --> B;') and it is wrapped as a diagram the editor renders. Defaults to the end of the document. Replies with what changed: the block count, the index it touched, the blocks it wrote and how later indexes shifted, not the whole document; call readDocument for the full block list.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string"
-              },
-              "html": {
-                "type": "string",
-                "description": "Block HTML, e.g. <p>...</p> or <h2>...</h2>."
-              },
-              "mermaid": {
-                "type": "string",
-                "description": "Mermaid diagram source. Use instead of html for a diagram."
-              },
-              "at": {
-                "type": "string",
-                "enum": [
-                  "end",
-                  "before",
-                  "after"
-                ],
-                "description": "Where to put it. Defaults to end."
-              },
-              "index": {
-                "type": "number",
-                "description": "The block to insert before or after. Required unless at is end."
-              }
-            },
-            "required": [
-              "path"
-            ]
-          }
-        },
-        {
-          "name": "replaceDocumentBlock",
-          "description": "Replace one block of a linked document, leaving the rest untouched. Pass html, or mermaid to make the block a diagram. Replies with what changed: the block count, the index it touched, the blocks it wrote and how later indexes shifted, not the whole document; call readDocument for the full block list.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string"
-              },
-              "index": {
-                "type": "number",
-                "description": "Block index from readDocument."
-              },
-              "html": {
-                "type": "string"
-              },
-              "mermaid": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "path",
-              "index"
-            ]
-          }
-        },
-        {
-        "name": "deleteDocumentBlock",
-        "risk": "destructive",
-          "description": "Delete one block of a linked document. Removing a block discards its content - to reword something use replaceDocumentBlock instead. Replies with the new block count and how later indexes shifted, not the whole document.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string"
-              },
-              "index": {
-                "type": "number",
-                "description": "Block index from readDocument."
-              }
-            },
-            "required": [
-              "path",
-              "index"
-            ]
-          },
-          "requiresApproval": true
-        },
-        {
-        "name": "exportDocumentsPdf",
-        "risk": "write",
-          "description": "Convert a project's documents to PDF, written beside each document in the workspace. Only documents created in this app can be converted; files attached to the project are already whatever they are and are reported as skipped. Omit paths to convert every document on the project.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string",
-                "description": "Defaults to the open project."
-              },
-              "paths": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "Document paths from getProject. Omit for all of them."
-              }
-            }
-          }
-        },
-        {
-        "name": "exportProjectZip",
-        "risk": "write",
-          "description": "Bundle a project's documents into a zip in the workspace Documents folder. Documents created here go in as PDFs; attached files go in as themselves. The result returns the saved path.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string",
-                "description": "Defaults to the open project."
-              },
-              "paths": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "Document paths from getProject. Omit for all of them."
-              }
-            }
-          }
-        },
-        {
-          "name": "reorderProject",
-          "description": "Move a project in the list. The list keeps the arrangement afterwards rather than sorting by urgency, so only do this when the user asks for an order - not to tidy.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": { "type": "string" },
-              "at": {
-                "type": "string",
-                "enum": ["top", "bottom", "before", "after"],
-                "description": "Defaults to top."
-              },
-              "targetProjectId": {
-                "type": "string",
-                "description": "Required when at is before or after."
-              }
-            },
-            "required": [
-              "projectId"
-            ]
-          }
-        },
-        {
-          "name": "linkDocument",
-          "description": "Attach reference material to a project: a document or other resource in the workspace, or a page on the web by its address.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string",
-                "description": "How it should read in the list."
-              },
-              "path": {
-                "type": "string",
-                "description": "Workspace path of the resource, or an https:// address for a page on the web."
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "document",
-                  "mail",
-                  "event",
-                  "web"
-                ],
-                "description": "document, mail, event, or web. Optional — an http(s) path is treated as web regardless."
-              }
-            },
-            "required": [
-              "projectId",
-              "label",
-              "path"
-            ]
-          },
-          "requiresApproval": true
-        },
-        {
-        "name": "archiveProject",
-        "risk": "destructive",
-          "description": "Put a project out of view without losing anything. Its status, deliverables, waits, journal and documents all stay exactly as they are, and it can be made active again at any time. This is what to do with work that is finished, abandoned or parked - prefer it over deleteProject, which destroys the record.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "true to archive, false to bring it back into view. Defaults to true."
-              }
-            },
-            "required": [
-              "projectId"
-            ]
-          }
-        },
-        {
-        "name": "deleteProject",
-        "risk": "destructive",
+          "name": "deleteProject",
+          "risk": "destructive",
           "description": "Delete a project permanently, with its deliverables, journal and links. This cannot be undone - prefer archiveProject, which puts it out of view and keeps the whole record. Only delete when the user asks to remove something outright.",
           "inputSchema": {
             "type": "object",
@@ -563,76 +715,89 @@
               "name"
             ]
           },
-          "requiresApproval": true
+          "requiresApproval": true,
+          "deletesPermanently": true
         },
         {
-        "name": "removeDeliverable",
-        "risk": "destructive",
-          "description": "Remove a deliverable from a project. To mark one finished use updateDeliverable with done - removing it discards the record that it existed.",
+          "name": "discoverAppTools",
+          "risk": "read",
+          "requiresApproval": false,
+          "description": "Discover PureProjects's extended specialist tools (17 tools across deliverables, documents, exports, journal, links, projects, waits) and composite functions (6 workflows). Prefer calling exposed composite functions and core tools first; use discoverAppTools when an edge case needs a specialist tool, then call it via callExtendedReadTool (for read-only tools) or callExtendedTool (for mutating tools).",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "projectId": {
-                "type": "string"
+              "query": {
+                "type": "string",
+                "description": "Optional keywords describing the capability you need (e.g. \"deliverables\", \"documents\", \"exports\", \"journal\", \"links\")."
               },
-              "deliverableId": {
-                "type": "string"
+              "category": {
+                "type": "string",
+                "description": "Optional category filter (deliverables, documents, exports, journal, links, projects, waits, or \"all\")."
+              },
+              "names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Optional exact tool names to fetch full JSON input schemas for."
+              },
+              "includeFunctions": {
+                "type": "boolean",
+                "description": "Include already-exposed composite functions and core tools in the listing (default false: searches extended tools first)."
+              }
+            }
+          }
+        },
+        {
+          "name": "callExtendedReadTool",
+          "risk": "read",
+          "requiresApproval": false,
+          "description": "Call one of PureProjects's read-only extended specialist tools discovered via discoverAppTools (categories: deliverables, documents, exports, journal, links, projects, waits). Strictly refuses mutating, destructive, external, or release tools.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "tool": {
+                "type": "string",
+                "description": "Exact name of a read-only extended tool from discoverAppTools."
+              },
+              "arguments": {
+                "type": "object",
+                "description": "Arguments object matching the tool’s inputSchema."
               }
             },
             "required": [
-              "projectId",
-              "deliverableId"
+              "tool"
             ]
-          },
-          "requiresApproval": true
+          }
         },
         {
-          "name": "moveDeliverable",
+          "name": "callExtendedTool",
           "risk": "write",
-          "description": "Move a deliverable to another project, unchanged: same title, owner, date and done state. The source project forgets it (and its next action, if that was it); the target lists it last. Use getProject for deliverable ids and listProjects for project ids.",
+          "requiresApproval": true,
+          "riskWhen": {
+            "confirmDestructive": "destructive"
+          },
+          "description": "Call one of PureProjects's mutating extended specialist tools discovered via discoverAppTools (categories: deliverables, documents, exports, journal, links, projects, waits). For destructive tools, set confirmDestructive: true after checking with the user. Strictly refuses read-only tools (use callExtendedReadTool), external tools, permanent-delete tools, and release tools.",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "projectId": {
+              "tool": {
                 "type": "string",
-                "description": "The project the deliverable is in now."
+                "description": "Exact name of a mutating extended tool from discoverAppTools."
               },
-              "deliverableId": {
-                "type": "string"
+              "arguments": {
+                "type": "object",
+                "description": "Arguments object matching the tool’s inputSchema."
               },
-              "toProjectId": {
-                "type": "string",
-                "description": "The project it moves to."
+              "confirmDestructive": {
+                "type": "boolean",
+                "description": "Required (true) when calling an extended tool marked risk: \"destructive\"."
               }
             },
             "required": [
-              "projectId",
-              "deliverableId",
-              "toProjectId"
+              "tool"
             ]
-          },
-          "requiresApproval": true
-        },
-        {
-        "name": "removeLink",
-        "risk": "destructive",
-          "description": "Unlink a document, mail thread or event from a project. The document itself is untouched - only the link is removed.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "projectId": {
-                "type": "string"
-              },
-              "linkId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "projectId",
-              "linkId"
-            ]
-          },
-          "requiresApproval": true
+          }
         }
       ]
     }
